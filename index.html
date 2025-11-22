@@ -75,13 +75,13 @@
         <!-- Vistas inyectadas aquí -->
     </main>
 
-    <!-- LOADING OVERLAY -->
+    <!-- LOADING OVERLAY (z-100) -->
     <div id="loading-overlay" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center z-[100]">
         <div class="loader mb-4"></div>
         <p class="text-slate-400 text-sm animate-pulse font-mono tracking-wide" id="loading-text">Inicializando sistemas judiciales...</p>
     </div>
 
-    <!-- MODAL DE CONFIRMACIÓN -->
+    <!-- MODAL DE CONFIRMACIÓN (z-200) -->
     <div id="confirm-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-sm w-full p-6 transform scale-100 transition-all">
             <h3 id="confirm-title" class="text-lg font-bold text-white mb-2">Confirmar Acción</h3>
@@ -93,8 +93,20 @@
         </div>
     </div>
 
-    <!-- TOASTS -->
-    <div id="toast-container" class="fixed bottom-5 right-5 z-[100] flex flex-col gap-2"></div>
+    <!-- MODAL DE INPUT (NUEVO PARA REEMPLAZAR PROMPT) -->
+    <div id="input-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-sm w-full p-6 transform scale-100 transition-all">
+            <h3 id="input-title" class="text-lg font-bold text-white mb-4">Ingresar Datos</h3>
+            <input type="text" id="input-field" class="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none mb-6 font-mono text-sm" placeholder="Escriba aquí..." autocomplete="off">
+            <div class="flex justify-end gap-3">
+                <button id="input-cancel" class="px-4 py-2 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition text-sm">Cancelar</button>
+                <button id="input-ok" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-900/20">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOASTS (z-300: Siempre visible encima de todo) -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
     <script>
         // CONFIG
@@ -116,7 +128,8 @@
             inmates: [],
             selectedInmate: null,
             isProcessing: false,
-            searchQuery: ""
+            searchQuery: "",
+            lastLocalUpdate: 0 // Timestamp para evitar notificaciones propias
         };
 
         // INICIALIZACIÓN
@@ -139,7 +152,9 @@
                     }
                 });
 
+                // Inicializar listeners de modales
                 document.getElementById('confirm-cancel').onclick = window.ui.hideConfirm;
+                document.getElementById('input-cancel').onclick = window.ui.hideInput;
 
             } catch (error) {
                 console.error("Init Error:", error);
@@ -150,6 +165,7 @@
         // UI HELPERS (Global)
         window.ui = {
             confirmCallback: null,
+            inputCallback: null,
 
             setLoading: (show, msg) => {
                 const el = document.getElementById('loading-overlay');
@@ -158,16 +174,35 @@
                 if(show && msg) el.querySelector('p').textContent = msg;
             },
 
-            showToast: (msg, type) => {
+            showToast: (msg, type = 'info') => {
                 const c = document.getElementById('toast-container');
                 if(!c) return;
                 const d = document.createElement('div');
-                d.className = `px-4 py-3 rounded shadow-lg border text-sm text-white ${type === 'error' ? 'bg-red-900 border-red-700' : 'bg-green-900 border-green-700'}`;
-                d.textContent = msg;
+                
+                let colors = 'bg-slate-800 border-slate-600';
+                let icon = 'ℹ️';
+
+                if (type === 'success') { colors = 'bg-green-900/90 border-green-700 text-white'; icon = '✅'; }
+                if (type === 'error') { colors = 'bg-red-900/90 border-red-700 text-white'; icon = '⚠️'; }
+                if (type === 'update') { colors = 'bg-blue-900/90 border-blue-700 text-white'; icon = '🔔'; }
+
+                d.className = `pointer-events-auto px-4 py-3 rounded shadow-lg border text-xs md:text-sm text-white flex items-center gap-3 animate-[slideIn_0.3s_ease-out] mb-2 backdrop-blur-sm ${colors}`;
+                d.innerHTML = `
+                    <span class="text-lg">${icon}</span>
+                    <span>${msg}</span>
+                `;
                 c.appendChild(d);
-                setTimeout(() => d.remove(), 3000);
+                
+                // Animación de salida
+                setTimeout(() => {
+                    d.style.transition = 'all 0.5s ease';
+                    d.style.opacity = '0';
+                    d.style.transform = 'translateY(10px)';
+                    setTimeout(() => d.remove(), 500);
+                }, 5000);
             },
 
+            // --- CONFIRM MODAL ---
             showConfirm: (title, msg, callback) => {
                 const modal = document.getElementById('confirm-modal');
                 document.getElementById('confirm-title').textContent = title;
@@ -187,6 +222,38 @@
                 const modal = document.getElementById('confirm-modal');
                 modal.classList.add('hidden');
                 window.ui.confirmCallback = null;
+            },
+
+            // --- INPUT MODAL (NUEVO) ---
+            showInput: (title, placeholder, callback) => {
+                const modal = document.getElementById('input-modal');
+                const input = document.getElementById('input-field');
+                
+                document.getElementById('input-title').textContent = title;
+                input.placeholder = placeholder;
+                input.value = ""; // Limpiar anterior
+                window.ui.inputCallback = callback;
+                
+                const okBtn = document.getElementById('input-ok');
+                okBtn.onclick = () => {
+                    const val = input.value.trim();
+                    if (val && window.ui.inputCallback) window.ui.inputCallback(val);
+                    window.ui.hideInput();
+                };
+
+                // Permitir enter para aceptar
+                input.onkeypress = (e) => {
+                    if (e.key === 'Enter') okBtn.click();
+                };
+                
+                modal.classList.remove('hidden');
+                setTimeout(() => input.focus(), 100); // Focus autom
+            },
+
+            hideInput: () => {
+                const modal = document.getElementById('input-modal');
+                modal.classList.add('hidden');
+                window.ui.inputCallback = null;
             },
 
             setupDragAndDrop: (id, cb) => {
@@ -216,18 +283,32 @@
             performOCR: async (file) => {
                 let img = file;
                 if (file.type === 'application/pdf') {
-                    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-                    const page = await pdf.getPage(1);
-                    const viewport = page.getViewport({ scale: 2.0 });
-                    const canvas = document.createElement('canvas');
-                    canvas.width = viewport.width; canvas.height = viewport.height;
-                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-                    img = canvas.toDataURL('image/png');
+                    const base64Img = await window.helpers.pdfToImageBase64(file);
+                    img = base64Img;
                 }
                 const worker = await Tesseract.createWorker('spa');
                 const ret = await worker.recognize(img);
                 await worker.terminate();
                 return ret.data.text;
+            },
+
+            pdfToImageBase64: async (file) => {
+                const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                const page = await pdf.getPage(1);
+                const viewport = page.getViewport({ scale: 2.0 });
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width; canvas.height = viewport.height;
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                return canvas.toDataURL('image/png');
+            },
+            
+            fileToBase64: (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = error => reject(error);
+                    reader.readAsDataURL(file);
+                });
             },
 
             callGeminiJSON: async (prompt) => {
@@ -240,6 +321,27 @@
                     })
                 });
                 if (!resp.ok) throw new Error("API IA Error");
+                const txt = (await resp.json()).candidates?.[0]?.content?.parts?.[0]?.text;
+                return JSON.parse(txt.replace(/```json|```/g, ''));
+            },
+
+            callGeminiVisionJSON: async (prompt, base64Image) => {
+                const base64Data = base64Image.split(',')[1];
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                { inlineData: { mimeType: "image/png", data: base64Data } }
+                            ]
+                        }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+                
+                if (!resp.ok) throw new Error("API IA Vision Error");
                 const txt = (await resp.json()).candidates?.[0]?.content?.parts?.[0]?.text;
                 return JSON.parse(txt.replace(/```json|```/g, ''));
             }
@@ -268,6 +370,10 @@
                         const ref = db.collection('inmate_profiles').doc();
                         batch.set(ref, { ...item, status: 'Activo', documents: [], createdAt: new Date() });
                     });
+                    
+                    // Marcar tiempo de actualización local
+                    window.state.lastLocalUpdate = Date.now();
+                    
                     await batch.commit();
                     window.ui.showToast(`${result.length} perfiles importados`, 'success');
                 } catch (e) {
@@ -294,7 +400,17 @@
                         text = await window.helpers.performOCR(file);
                     }
 
-                    if (text.length < 10) throw new Error("Texto ilegible");
+                    if (text.length < 10) {
+                        window.ui.setLoading(false); 
+                        window.ui.showConfirm(
+                            "Lectura Difícil Detectada", 
+                            "El escaneo automático falló. ¿Desea que la IA analice la imagen visualmente?",
+                            async () => {
+                                await window.logic.processDocumentWithVision(file);
+                            }
+                        );
+                        return; 
+                    }
 
                     window.ui.setLoading(true, "Interpretando con IA...");
                     const analysis = await window.helpers.callGeminiJSON(`
@@ -303,23 +419,57 @@
                         Texto: ${text.substring(0, 15000)}
                     `);
 
-                    window.ui.setLoading(true, "Subiendo archivo...");
-                    const ref = firebase.storage().ref().child(`docs/${window.state.selectedInmate.id}/${Date.now()}_${file.name}`);
-                    await ref.put(file);
-                    const url = await ref.getDownloadURL();
+                    await window.logic.saveDocumentToProfile(file, analysis);
 
-                    await firebase.firestore().collection('inmate_profiles').doc(window.state.selectedInmate.id).update({
-                        documents: firebase.firestore.FieldValue.arrayUnion({ ...analysis, url, uploadedAt: new Date().toISOString() })
-                    });
-                    
-                    window.app.selectInmate(window.state.selectedInmate.id);
-                    window.ui.showToast("Documento agregado", 'success');
                 } catch (e) {
                     console.error(e);
                     window.ui.showToast("Error: " + e.message, 'error');
                 } finally {
+                    if (window.state.isProcessing) window.ui.setLoading(false);
+                }
+            },
+
+            processDocumentWithVision: async (file) => {
+                window.ui.setLoading(true, "Analizando visualmente con Gemini Vision...");
+                try {
+                    let base64Img = "";
+                    if (file.type === 'application/pdf') {
+                        base64Img = await window.helpers.pdfToImageBase64(file);
+                    } else {
+                        base64Img = await window.helpers.fileToBase64(file);
+                    }
+
+                    const analysis = await window.helpers.callGeminiVisionJSON(`
+                        Analiza esta imagen de un documento legal. Extrae la información en JSON exacto:
+                        {"documentDate": "YYYY-MM-DD", "documentType": "Tipo", "keyFindings": "Resumen 2 lineas"}
+                    `, base64Img);
+
+                    await window.logic.saveDocumentToProfile(file, analysis);
+
+                } catch (e) {
+                    console.error("Vision Error:", e);
+                    window.ui.showToast("Error en análisis visual: " + e.message, 'error');
+                } finally {
                     window.ui.setLoading(false);
                 }
+            },
+
+            saveDocumentToProfile: async (file, analysis) => {
+                window.ui.setLoading(true, "Subiendo archivo...");
+                const ref = firebase.storage().ref().child(`docs/${window.state.selectedInmate.id}/${Date.now()}_${file.name}`);
+                await ref.put(file);
+                const url = await ref.getDownloadURL();
+
+                // Marcar tiempo de actualización local ANTES del update
+                window.state.lastLocalUpdate = Date.now();
+
+                await firebase.firestore().collection('inmate_profiles').doc(window.state.selectedInmate.id).update({
+                    documents: firebase.firestore.FieldValue.arrayUnion({ ...analysis, url, uploadedAt: new Date().toISOString() })
+                });
+                
+                window.app.selectInmate(window.state.selectedInmate.id);
+                window.ui.setLoading(false); // Forzar cierre de loader antes del toast
+                window.ui.showToast("Documento agregado con éxito", 'success');
             },
 
             deleteDocument: (docUrl) => {
@@ -336,12 +486,13 @@
                             const currentDocs = snapshot.data().documents || [];
                             const updatedDocs = currentDocs.filter(d => d.url !== docUrl);
 
+                            window.state.lastLocalUpdate = Date.now();
                             await docRef.update({ documents: updatedDocs });
 
                             try {
                                 await firebase.storage().refFromURL(docUrl).delete();
                             } catch (storageErr) {
-                                console.warn("Archivo ya no existía en storage o error de permisos", storageErr);
+                                console.warn("Archivo ya no existía en storage", storageErr);
                             }
 
                             window.ui.showToast("Documento eliminado correctamente", "success");
@@ -359,7 +510,6 @@
             },
 
             toggleStatus: (id, currentStatusRaw) => {
-                // FIX: Sanitizar entrada. Si es "undefined" (string) o falsy, usar 'Activo'
                 const currentStatus = (currentStatusRaw && currentStatusRaw !== 'undefined') ? currentStatusRaw : 'Activo';
                 const newStatus = currentStatus === 'Activo' ? 'Libertad Definitiva' : 'Activo';
                 const message = `¿Desea cambiar el estado del interno de "${currentStatus}" a "${newStatus}"?`;
@@ -369,6 +519,7 @@
                     message,
                     async () => {
                         try {
+                            window.state.lastLocalUpdate = Date.now();
                             await firebase.firestore().collection('inmate_profiles').doc(id).update({
                                 status: newStatus
                             });
@@ -402,8 +553,45 @@
                 const db = firebase.firestore();
                 db.collection('inmate_profiles').orderBy('fullName')
                     .onSnapshot((snapshot) => {
+                        snapshot.docChanges().forEach((change) => {
+                            // Ignorar cambios locales inmediatos
+                            if (!change.doc.metadata.hasPendingWrites) {
+                                
+                                // ANTI-ECO: Si el cambio ocurrió hace menos de 2 seg y yo hice una acción, ignorar.
+                                if (window.state.lastLocalUpdate && (Date.now() - window.state.lastLocalUpdate < 2000)) {
+                                    console.log("Ignorando notificación propia (Anti-Eco)");
+                                    return;
+                                }
+
+                                const newData = change.doc.data();
+                                
+                                if (change.type === 'modified') {
+                                    const prevData = window.state.inmates.find(i => i.id === change.doc.id);
+                                    if (prevData) {
+                                        const newDocsCount = newData.documents?.length || 0;
+                                        const oldDocsCount = prevData.documents?.length || 0;
+                                        
+                                        // NUEVO TEXTO DE NOTIFICACIÓN SOLICITADO
+                                        if (newDocsCount > oldDocsCount) {
+                                            window.ui.showToast(`🔔 Actualización: Se agregaron documentos nuevos en el perfil del interno ${newData.fullName}`, 'update');
+                                        }
+
+                                        if (newData.status !== prevData.status) {
+                                            window.ui.showToast(`🔔 Estado: ${newData.fullName} ahora está "${newData.status}"`, 'update');
+                                        }
+                                    }
+                                }
+                                
+                                if (change.type === 'added' && window.state.inmates.length > 0) {
+                                    window.ui.showToast(`🔔 Nuevo Legajo: Se ha ingresado a ${newData.fullName}`, 'update');
+                                }
+                            }
+                        });
+
                         window.state.inmates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        window.app.updateStats(); // ACTUALIZAR ESTADISTICAS
                         window.app.refreshInmateList();
+                        
                         if(window.state.selectedInmate) {
                             const updated = window.state.inmates.find(i => i.id === window.state.selectedInmate.id);
                             if(updated) {
@@ -416,29 +604,44 @@
                     });
             },
 
+            updateStats: () => {
+                const total = window.state.inmates.length;
+                // Considerar 'Activo' o undefined como activo (por compatibilidad hacia atras)
+                const active = window.state.inmates.filter(i => !i.status || i.status === 'Activo').length;
+                
+                const totalEl = document.getElementById('total-count');
+                const activeEl = document.getElementById('active-count');
+                
+                if (totalEl) totalEl.textContent = total;
+                if (activeEl) activeEl.textContent = active;
+            },
+
             selectInmate: (id) => {
                 window.state.selectedInmate = window.state.inmates.find(i => i.id === id);
                 window.app.renderInmateDetail();
             },
 
-            createManualInmate: async () => {
-                const name = prompt("Nombre del interno:");
-                if (!name) return;
-                try {
-                    const db = firebase.firestore();
-                    const docRef = await db.collection('inmate_profiles').add({
-                        fullName: name,
-                        inmateId: 'MAN-' + Date.now().toString().slice(-6),
-                        crimeSummary: 'Perfil manual',
-                        status: 'Activo',
-                        documents: [],
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    window.ui.showToast("Perfil creado", 'success');
-                    window.app.selectInmate(docRef.id);
-                } catch (err) {
-                    window.ui.showToast("Error creando perfil", 'error');
-                }
+            createManualInmate: () => {
+                // REEMPLAZO DE PROMPT POR MODAL
+                window.ui.showInput("Crear Nuevo Perfil", "Ingrese nombre completo del interno:", async (name) => {
+                    try {
+                        const db = firebase.firestore();
+                        const docRef = await db.collection('inmate_profiles').add({
+                            fullName: name,
+                            inmateId: 'MAN-' + Date.now().toString().slice(-6),
+                            crimeSummary: 'Perfil manual',
+                            status: 'Activo',
+                            documents: [],
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        
+                        window.state.lastLocalUpdate = Date.now();
+                        window.ui.showToast("Perfil creado", 'success');
+                        window.app.selectInmate(docRef.id);
+                    } catch (err) {
+                        window.ui.showToast("Error creando perfil", 'error');
+                    }
+                });
             },
 
             renderLogin: () => {
@@ -461,6 +664,15 @@
                 container.innerHTML = `
                     <aside class="w-full md:w-80 bg-slate-900 border-r border-slate-800 flex flex-col h-1/3 md:h-full flex-none overflow-hidden z-10">
                         <div class="p-4 border-b border-slate-800 space-y-3 bg-slate-900">
+                            <!-- STATS ROW -->
+                            <div class="flex justify-between items-center px-1 mb-1">
+                                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Estadísticas</span>
+                                <div class="flex gap-3 text-xs font-mono">
+                                    <span class="text-slate-400">Total: <b id="total-count" class="text-white">...</b></span>
+                                    <span class="text-green-500/80">Activos: <b id="active-count" class="text-green-400">...</b></span>
+                                </div>
+                            </div>
+
                             <input type="text" placeholder="Buscar..." 
                                 oninput="window.app.handleSearch(this.value)"
                                 class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none">
@@ -484,6 +696,8 @@
                     </section>
                 `;
                 window.ui.setupDragAndDrop('mass-upload-zone', (files) => window.logic.processMassList(files[0]));
+                // Actualizar stats iniciales si ya hay datos cargados
+                if(window.state.inmates.length > 0) window.app.updateStats();
             },
 
             refreshInmateList: () => {
@@ -524,7 +738,6 @@
                 const isFree = i.status === 'Libertad Definitiva';
                 const statusColor = isFree ? 'bg-green-900/50 text-green-400 border-green-900' : 'bg-blue-900/50 text-blue-400 border-blue-900';
 
-                // FIX: Pasar explicitamente 'Activo' si el status es undefined para evitar el string "undefined" en JS
                 container.innerHTML = `
                     <div class="flex-none p-6 border-b border-slate-800 bg-slate-900/50">
                         <div class="flex justify-between items-start mb-2">
