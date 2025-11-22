@@ -189,7 +189,9 @@
             appId: "1:449122558886:web:b440366cb44f8ec2252567"
         };
 
-        const apiKey = "AIzaSyBRzsFTxqfP382htEEyvS1spx8p7TubLFY";
+        // IMPORTANTE: PEGA TU NUEVA API KEY AQUÍ ENTRE LAS COMILLAS
+        const apiKey = "AIzaSyBRzsFTxqfP382htEEyvS1spx8p7TubLFY"; // <--- TU NUEVA KEY AQUI
+        
         const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
 
         window.state = {
@@ -669,6 +671,7 @@
                 const inmate = window.state.selectedInmate;
                 const docs = inmate.documents || [];
                 
+                // Construir Contexto Híbrido: Resúmenes + Texto Completo Cargado
                 let contextText = `Estás analizando el legajo judicial de ${inmate.fullName} (ID: ${inmate.inmateId}).\n\n`;
                 
                 contextText += "--- RESÚMENES DISPONIBLES ---\n";
@@ -681,7 +684,18 @@
                     contextText += "\n--- CONTENIDO COMPLETO DE DOCUMENTOS CARGADOS ---\n" + window.state.chatFullContext;
                 }
 
-                const prompt = `${contextText}\n\nPREGUNTA DEL USUARIO: "${question}"\n\nINSTRUCCIONES: Responde basándote ÚNICAMENTE en la información provista arriba. Si la respuesta está en el contenido completo, sé detallado. Cita el documento fuente.`;
+                // NUEVO PROMPT HÍBRIDO: Permite conocimiento general si no es específico del caso
+                const prompt = `
+                    CONTEXTO DEL CASO:
+                    ${contextText}
+
+                    PREGUNTA DEL USUARIO: "${question}"
+
+                    INSTRUCCIONES PARA EL ASISTENTE JURÍDICO:
+                    1. DATOS DEL CASO: Si la pregunta se refiere a hechos, fechas o personas de ESTE legajo específico, responde ÚNICAMENTE basándote en la información provista arriba. Si el dato no está, di "No consta en los documentos analizados".
+                    2. CONOCIMIENTO LEGAL GENERAL: Si la pregunta es teórica, conceptual o sobre leyes generales (ej: "¿Qué es el habeas corpus?", "Plazos procesales"), responde usando tu amplio conocimiento jurídico general, sin limitarte a los documentos.
+                    3. CITA FUENTES: Cuando uses información de los documentos, indica cuál usaste (ej: "[Doc 1]").
+                `;
 
                 const loadingDiv = document.createElement('div');
                 loadingDiv.className = 'chat-bubble chat-ai animate-pulse';
@@ -1022,17 +1036,12 @@
             },
             renderDashboard: () => {
                 const canEdit = window.state.role !== 'consulta';
-                const canClean = window.state.role === 'juez';
                 
                 document.getElementById('app-container').innerHTML = `
                     <aside class="w-full md:w-80 bg-slate-900 border-r border-slate-800 flex flex-col h-1/3 md:h-full flex-none overflow-hidden z-10">
                         <div class="p-4 border-b border-slate-800 space-y-3 bg-slate-900">
                             <div class="flex justify-between items-center px-1 mb-1">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Estadísticas</span>
-                                    <!-- Botón de limpieza solo para Juez -->
-                                    ${canClean ? `<button onclick="window.logic.checkAndCleanDuplicates()" class="text-xs bg-slate-800 hover:bg-red-900/30 text-slate-400 hover:text-red-400 p-1 rounded transition" title="Detectar y limpiar duplicados">🧹</button>` : ''}
-                                </div>
+                                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Estadísticas</span>
                                 <div class="flex gap-3 text-xs font-mono">
                                     <span class="text-slate-400">Total: <b id="total-count" class="text-white">...</b></span>
                                     <span class="text-green-500/80">Activos: <b id="active-count" class="text-green-400">...</b></span>
