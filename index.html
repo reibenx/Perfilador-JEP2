@@ -23,6 +23,9 @@
     <!-- TESSERACT.JS v5 -->
     <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
 
+    <!-- MARKDOWN PARSER (Para respuestas de IA) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
     <style>
         /* Estilos base */
         body { font-family: 'Inter', sans-serif; background-color: #020617; color: #e2e8f0; }
@@ -47,6 +50,16 @@
         /* Drag & Drop */
         .drop-zone { border: 2px dashed #334155; transition: all 0.2s; }
         .drop-zone.dragover { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.1); }
+
+        /* Drawer de Auditoría */
+        .audit-drawer { transition: transform 0.3s ease-in-out; }
+        .audit-drawer.open { transform: translateX(0); }
+        .audit-drawer.closed { transform: translateX(100%); }
+
+        /* Chat IA */
+        .chat-bubble { max-width: 80%; border-radius: 12px; padding: 10px; font-size: 0.9rem; }
+        .chat-user { background-color: #1e293b; align-self: flex-end; color: white; }
+        .chat-ai { background-color: #172554; align-self: flex-start; color: #bfdbfe; border: 1px solid #1e3a8a; }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden bg-slate-950">
@@ -63,7 +76,10 @@
             </div>
         </div>
         <div id="user-info" class="hidden flex items-center gap-4">
-            <span id="user-email" class="text-sm text-slate-300 hidden md:inline"></span>
+            <div class="text-right">
+                <span id="user-email" class="block text-sm text-slate-300"></span>
+                <span id="user-role-badge" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400 uppercase font-bold tracking-wider"></span>
+            </div>
             <button onclick="window.app.logout()" class="text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 px-3 py-1.5 rounded border border-red-900 transition">
                 Salir
             </button>
@@ -75,41 +91,75 @@
         <!-- Vistas inyectadas aquí -->
     </main>
 
-    <!-- LOADING OVERLAY (z-100) -->
+    <!-- DRAWER DE AUDITORÍA -->
+    <div id="audit-overlay" class="hidden fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[150]" onclick="window.ui.closeAudit()"></div>
+    <div id="audit-drawer" class="audit-drawer closed fixed top-0 right-0 h-full w-96 bg-slate-900 border-l border-slate-700 shadow-2xl z-[160] flex flex-col">
+        <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                📜 Historial de Auditoría
+            </h3>
+            <button onclick="window.ui.closeAudit()" class="text-slate-400 hover:text-white">✕</button>
+        </div>
+        <div id="audit-list" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+    </div>
+
+    <!-- MODAL CHAT IA (RAG) -->
+    <div id="chat-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-2xl h-[600px] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-slate-800 bg-slate-950 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-blue-400 flex items-center gap-2">
+                    🤖 Asistente Jurídico IA
+                    <span class="text-xs text-slate-500 font-normal ml-2">(Analizando legajo activo)</span>
+                </h3>
+                <button onclick="window.ui.closeChat()" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <div id="chat-history" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-slate-900/50">
+                <div class="chat-ai chat-bubble">
+                    Hola. He analizado los documentos de este legajo. ¿Qué deseas saber?
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-800 bg-slate-950 flex gap-2">
+                <input type="text" id="chat-input" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:border-blue-500 outline-none" placeholder="Ej: ¿En qué fecha se otorgó la libertad?..." onkeypress="if(event.key === 'Enter') window.logic.sendChatMessage()">
+                <button onclick="window.logic.sendChatMessage()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOADING OVERLAY -->
     <div id="loading-overlay" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center z-[100]">
         <div class="loader mb-4"></div>
         <p class="text-slate-400 text-sm animate-pulse font-mono tracking-wide" id="loading-text">Inicializando sistemas judiciales...</p>
     </div>
 
-    <!-- MODAL DE CONFIRMACIÓN (z-200) -->
+    <!-- MODALES GENÉRICOS -->
     <div id="confirm-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-sm w-full p-6 transform scale-100 transition-all">
-            <h3 id="confirm-title" class="text-lg font-bold text-white mb-2">Confirmar Acción</h3>
-            <p id="confirm-message" class="text-slate-300 text-sm mb-6 leading-relaxed">¿Está seguro de continuar?</p>
+        <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-sm w-full p-6">
+            <h3 id="confirm-title" class="text-lg font-bold text-white mb-2">Confirmar</h3>
+            <p id="confirm-message" class="text-slate-300 text-sm mb-6">¿Seguro?</p>
             <div class="flex justify-end gap-3">
-                <button id="confirm-cancel" class="px-4 py-2 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition text-sm">Cancelar</button>
-                <button id="confirm-ok" class="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-lg shadow-red-900/20">Confirmar</button>
+                <button id="confirm-cancel" class="px-4 py-2 rounded text-slate-400 hover:text-white text-sm">Cancelar</button>
+                <button id="confirm-ok" class="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-bold text-sm">Confirmar</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL DE INPUT (NUEVO PARA REEMPLAZAR PROMPT) -->
     <div id="input-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-sm w-full p-6 transform scale-100 transition-all">
-            <h3 id="input-title" class="text-lg font-bold text-white mb-4">Ingresar Datos</h3>
-            <input type="text" id="input-field" class="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none mb-6 font-mono text-sm" placeholder="Escriba aquí..." autocomplete="off">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-sm w-full p-6">
+            <h3 id="input-title" class="text-lg font-bold text-white mb-4">Datos</h3>
+            <input type="text" id="input-field" class="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none mb-6 font-mono text-sm" autocomplete="off">
             <div class="flex justify-end gap-3">
-                <button id="input-cancel" class="px-4 py-2 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition text-sm">Cancelar</button>
-                <button id="input-ok" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-900/20">Aceptar</button>
+                <button id="input-cancel" class="px-4 py-2 rounded text-slate-400 hover:text-white text-sm">Cancelar</button>
+                <button id="input-ok" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm">Aceptar</button>
             </div>
         </div>
     </div>
 
-    <!-- TOASTS (z-300: Siempre visible encima de todo) -->
+    <!-- TOASTS -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-[300] flex flex-col gap-2 pointer-events-none"></div>
 
     <script>
-        // CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyCP0FlSV9PECEVq6iWJ6ajT7b0yzRcVggw",
             authDomain: "perfilador-penitenciario.firebaseapp.com",
@@ -122,17 +172,16 @@
         const GEMINI_API_KEY = "AIzaSyD75ul9bSgckdpm35z2WjRUPtS_z4RWAfY";
         const GEMINI_MODEL = "gemini-2.5-flash";
 
-        // ESTADO GLOBAL
         window.state = {
             user: null,
+            role: 'consulta', // juez, secretario, consulta
             inmates: [],
             selectedInmate: null,
             isProcessing: false,
             searchQuery: "",
-            lastLocalUpdate: 0 // Timestamp para evitar notificaciones propias
+            lastLocalUpdate: 0
         };
 
-        // INICIALIZACIÓN
         window.onload = function() {
             try {
                 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
@@ -142,8 +191,20 @@
                     window.ui.setLoading(false);
 
                     if (user) {
+                        // RECUPERAR ROL (Simulado por localStorage para demo, en prod sería Firestore)
+                        const storedRole = localStorage.getItem('user_role_pref') || 'consulta';
+                        window.state.role = storedRole;
+                        
                         document.getElementById('user-info').classList.remove('hidden');
                         document.getElementById('user-email').textContent = user.email;
+                        document.getElementById('user-role-badge').textContent = storedRole;
+                        
+                        // Colores de badge según rol
+                        const badge = document.getElementById('user-role-badge');
+                        if (storedRole === 'juez') badge.className = "text-[10px] bg-yellow-900/50 text-yellow-400 px-2 py-0.5 rounded uppercase font-bold tracking-wider border border-yellow-700";
+                        else if (storedRole === 'secretario') badge.className = "text-[10px] bg-blue-900/50 text-blue-400 px-2 py-0.5 rounded uppercase font-bold tracking-wider border border-blue-700";
+                        else badge.className = "text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded uppercase font-bold tracking-wider border border-slate-600";
+
                         window.app.renderDashboard();
                         window.app.subscribeToInmates();
                     } else {
@@ -152,17 +213,15 @@
                     }
                 });
 
-                // Inicializar listeners de modales
                 document.getElementById('confirm-cancel').onclick = window.ui.hideConfirm;
                 document.getElementById('input-cancel').onclick = window.ui.hideInput;
 
             } catch (error) {
                 console.error("Init Error:", error);
-                alert("Error inicializando. Revise consola.");
+                alert("Error inicializando.");
             }
         };
 
-        // UI HELPERS (Global)
         window.ui = {
             confirmCallback: null,
             inputCallback: null,
@@ -178,7 +237,6 @@
                 const c = document.getElementById('toast-container');
                 if(!c) return;
                 const d = document.createElement('div');
-                
                 let colors = 'bg-slate-800 border-slate-600';
                 let icon = 'ℹ️';
 
@@ -187,13 +245,8 @@
                 if (type === 'update') { colors = 'bg-blue-900/90 border-blue-700 text-white'; icon = '🔔'; }
 
                 d.className = `pointer-events-auto px-4 py-3 rounded shadow-lg border text-xs md:text-sm text-white flex items-center gap-3 animate-[slideIn_0.3s_ease-out] mb-2 backdrop-blur-sm ${colors}`;
-                d.innerHTML = `
-                    <span class="text-lg">${icon}</span>
-                    <span>${msg}</span>
-                `;
+                d.innerHTML = `<span class="text-lg">${icon}</span><span>${msg}</span>`;
                 c.appendChild(d);
-                
-                // Animación de salida
                 setTimeout(() => {
                     d.style.transition = 'all 0.5s ease';
                     d.style.opacity = '0';
@@ -202,58 +255,79 @@
                 }, 5000);
             },
 
-            // --- CONFIRM MODAL ---
             showConfirm: (title, msg, callback) => {
                 const modal = document.getElementById('confirm-modal');
                 document.getElementById('confirm-title').textContent = title;
                 document.getElementById('confirm-message').textContent = msg;
                 window.ui.confirmCallback = callback;
-                
                 const okBtn = document.getElementById('confirm-ok');
-                okBtn.onclick = () => {
-                    if (window.ui.confirmCallback) window.ui.confirmCallback();
-                    window.ui.hideConfirm();
-                };
-                
+                okBtn.onclick = () => { if (window.ui.confirmCallback) window.ui.confirmCallback(); window.ui.hideConfirm(); };
                 modal.classList.remove('hidden');
             },
+            hideConfirm: () => { document.getElementById('confirm-modal').classList.add('hidden'); window.ui.confirmCallback = null; },
 
-            hideConfirm: () => {
-                const modal = document.getElementById('confirm-modal');
-                modal.classList.add('hidden');
-                window.ui.confirmCallback = null;
-            },
-
-            // --- INPUT MODAL (NUEVO) ---
             showInput: (title, placeholder, callback) => {
                 const modal = document.getElementById('input-modal');
                 const input = document.getElementById('input-field');
-                
                 document.getElementById('input-title').textContent = title;
                 input.placeholder = placeholder;
-                input.value = ""; // Limpiar anterior
+                input.value = ""; 
                 window.ui.inputCallback = callback;
-                
                 const okBtn = document.getElementById('input-ok');
                 okBtn.onclick = () => {
                     const val = input.value.trim();
                     if (val && window.ui.inputCallback) window.ui.inputCallback(val);
                     window.ui.hideInput();
                 };
-
-                // Permitir enter para aceptar
-                input.onkeypress = (e) => {
-                    if (e.key === 'Enter') okBtn.click();
-                };
-                
+                input.onkeypress = (e) => { if (e.key === 'Enter') okBtn.click(); };
                 modal.classList.remove('hidden');
-                setTimeout(() => input.focus(), 100); // Focus autom
+                setTimeout(() => input.focus(), 100);
             },
+            hideInput: () => { document.getElementById('input-modal').classList.add('hidden'); window.ui.inputCallback = null; },
+            
+            openAudit: async (inmateId) => {
+                // RBAC CHECK: Solo Juez
+                if (window.state.role !== 'juez') {
+                    window.ui.showToast("Acceso denegado: Solo Jueces pueden auditar.", "error");
+                    return;
+                }
 
-            hideInput: () => {
-                const modal = document.getElementById('input-modal');
-                modal.classList.add('hidden');
-                window.ui.inputCallback = null;
+                const drawer = document.getElementById('audit-drawer');
+                const overlay = document.getElementById('audit-overlay');
+                const list = document.getElementById('audit-list');
+                drawer.classList.remove('closed'); drawer.classList.add('open'); overlay.classList.remove('hidden');
+                list.innerHTML = '<div class="flex justify-center mt-10"><div class="loader"></div></div>';
+
+                try {
+                    const snapshot = await firebase.firestore().collection('audit_logs').where('inmateId', '==', inmateId).get();
+                    if (snapshot.empty) { list.innerHTML = '<p class="text-center text-slate-500 text-sm mt-10">Sin registros.</p>'; return; }
+                    const sortedData = snapshot.docs.map(doc => doc.data()).sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)).slice(0, 50);
+                    list.innerHTML = sortedData.map(data => {
+                        const date = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString() : 'S/F';
+                        let icon = '📝'; let color = 'text-slate-300';
+                        if (data.action.includes('Elimin')) { icon = '🗑️'; color = 'text-red-400'; }
+                        if (data.action.includes('Creaci')) { icon = '✨'; color = 'text-green-400'; }
+                        return `<div class="bg-slate-800/50 p-3 rounded border border-slate-700 text-sm"><div class="flex justify-between items-start mb-1"><span class="font-bold ${color} flex items-center gap-1">${icon} ${data.action}</span><span class="text-[10px] text-slate-500">${date}</span></div><p class="text-xs text-slate-300 mb-1">${data.details}</p><div class="text-[10px] text-slate-500 border-t border-slate-700 pt-1 mt-2">Usuario: <span class="text-slate-400">${data.userEmail}</span></div></div>`;
+                    }).join('');
+                } catch (e) { list.innerHTML = '<p class="text-center text-red-500 text-sm">Error.</p>'; }
+            },
+            closeAudit: () => { document.getElementById('audit-drawer').classList.remove('open'); document.getElementById('audit-drawer').classList.add('closed'); document.getElementById('audit-overlay').classList.add('hidden'); },
+
+            // --- CHAT RAG UI ---
+            openChat: () => {
+                document.getElementById('chat-modal').classList.remove('hidden');
+                document.getElementById('chat-input').focus();
+            },
+            closeChat: () => document.getElementById('chat-modal').classList.add('hidden'),
+            
+            addChatMessage: (text, sender) => {
+                const history = document.getElementById('chat-history');
+                const div = document.createElement('div');
+                div.className = `chat-bubble ${sender === 'user' ? 'chat-user' : 'chat-ai'}`;
+                // Si es AI, parsear markdown simple
+                div.innerHTML = sender === 'ai' ? marked.parse(text) : text;
+                history.appendChild(div);
+                history.scrollTop = history.scrollHeight;
             },
 
             setupDragAndDrop: (id, cb) => {
@@ -267,7 +341,6 @@
             }
         };
 
-        // LOGIC & HELPERS (Global)
         window.helpers = {
             extractNativeTextPDF: async (file) => {
                 const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
@@ -279,19 +352,14 @@
                 }
                 return fullText;
             },
-
             performOCR: async (file) => {
                 let img = file;
-                if (file.type === 'application/pdf') {
-                    const base64Img = await window.helpers.pdfToImageBase64(file);
-                    img = base64Img;
-                }
+                if (file.type === 'application/pdf') img = await window.helpers.pdfToImageBase64(file);
                 const worker = await Tesseract.createWorker('spa');
                 const ret = await worker.recognize(img);
                 await worker.terminate();
                 return ret.data.text;
             },
-
             pdfToImageBase64: async (file) => {
                 const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
                 const page = await pdf.getPage(1);
@@ -301,7 +369,6 @@
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
                 return canvas.toDataURL('image/png');
             },
-            
             fileToBase64: (file) => {
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
@@ -310,7 +377,6 @@
                     reader.readAsDataURL(file);
                 });
             },
-
             callGeminiJSON: async (prompt) => {
                 const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
@@ -324,69 +390,110 @@
                 const txt = (await resp.json()).candidates?.[0]?.content?.parts?.[0]?.text;
                 return JSON.parse(txt.replace(/```json|```/g, ''));
             },
-
             callGeminiVisionJSON: async (prompt, base64Image) => {
                 const base64Data = base64Image.split(',')[1];
                 const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                { inlineData: { mimeType: "image/png", data: base64Data } }
-                            ]
-                        }],
+                        contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/png", data: base64Data } }] }],
                         generationConfig: { responseMimeType: "application/json" }
                     })
                 });
-                
                 if (!resp.ok) throw new Error("API IA Vision Error");
                 const txt = (await resp.json()).candidates?.[0]?.content?.parts?.[0]?.text;
                 return JSON.parse(txt.replace(/```json|```/g, ''));
+            },
+            // RAG HELPER: TEXTO LIBRE
+            callGeminiFreeText: async (prompt) => {
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                if (!resp.ok) throw new Error("API IA Error");
+                return (await resp.json()).candidates?.[0]?.content?.parts?.[0]?.text;
             }
         };
 
-        // APP LOGIC (Global)
         window.logic = {
+            logAudit: async (inmateId, action, details) => {
+                try {
+                    await firebase.firestore().collection('audit_logs').add({
+                        inmateId, action, details, userId: window.state.user.uid, userEmail: window.state.user.email, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } catch (e) { console.error("Error log:", e); }
+            },
+
+            // --- LOGICA RAG ---
+            sendChatMessage: async () => {
+                const input = document.getElementById('chat-input');
+                const question = input.value.trim();
+                if (!question) return;
+
+                window.ui.addChatMessage(question, 'user');
+                input.value = '';
+
+                // Construir Contexto RAG
+                const inmate = window.state.selectedInmate;
+                const docs = inmate.documents || [];
+                
+                let contextText = `Estás analizando el legajo judicial de ${inmate.fullName} (ID: ${inmate.inmateId}).\n\nDOCUMENTOS DISPONIBLES:\n`;
+                
+                if (docs.length === 0) {
+                    contextText += "No hay documentos cargados en este legajo.\n";
+                } else {
+                    docs.forEach((d, i) => {
+                        contextText += `[Doc ${i+1}] Tipo: ${d.documentType}. Fecha: ${d.documentDate}. Resumen Clave: ${d.keyFindings}\n`;
+                    });
+                }
+
+                const prompt = `${contextText}\n\nPREGUNTA DEL USUARIO: "${question}"\n\nINSTRUCCIONES: Responde basándote ÚNICAMENTE en la información de los documentos listados arriba. Si la información no está en los documentos, dilo. Cita el documento fuente (ej: "[Doc 1]") en tu respuesta.`;
+
+                // Indicador de carga en chat
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'chat-bubble chat-ai animate-pulse';
+                loadingDiv.textContent = 'Analizando documentos...';
+                loadingDiv.id = 'chat-loading';
+                document.getElementById('chat-history').appendChild(loadingDiv);
+
+                try {
+                    const answer = await window.helpers.callGeminiFreeText(prompt);
+                    document.getElementById('chat-loading').remove();
+                    window.ui.addChatMessage(answer, 'ai');
+                } catch (e) {
+                    document.getElementById('chat-loading').remove();
+                    window.ui.addChatMessage("Error de conexión con la IA.", 'ai');
+                }
+            },
+
+            // ... (Resto de lógica anterior sin cambios mayores, solo integración de roles)
             processMassList: async (file) => {
+                if (window.state.role === 'consulta') return window.ui.showToast("Permiso denegado", "error");
+                // ... (codigo existente processMassList)
                 if (!file || file.type !== 'application/pdf') return window.ui.showToast('Use PDF para carga masiva', 'error');
                 window.ui.setLoading(true, "Procesando lista...");
                 try {
                     const text = await window.helpers.extractNativeTextPDF(file);
                     if (text.length < 50) throw new Error("PDF escaneado/imagen no soportado para listas masivas.");
-
-                    const result = await window.helpers.callGeminiJSON(`
-                        Extrae lista de internos de este texto penitenciario.
-                        Salida JSON Array: [{"inmateId": "string", "fullName": "string", "crimeSummary": "corto"}].
-                        Texto: ${text.substring(0, 30000)}
-                    `);
-                    
+                    const result = await window.helpers.callGeminiJSON(`Extrae lista de internos. Salida JSON Array: [{"inmateId": "string", "fullName": "string", "crimeSummary": "corto"}]. Texto: ${text.substring(0, 30000)}`);
                     if (!Array.isArray(result)) throw new Error("Formato inválido de IA");
-
                     const db = firebase.firestore();
                     const batch = db.batch();
                     result.forEach(item => {
                         const ref = db.collection('inmate_profiles').doc();
                         batch.set(ref, { ...item, status: 'Activo', documents: [], createdAt: new Date() });
                     });
-                    
-                    // Marcar tiempo de actualización local
                     window.state.lastLocalUpdate = Date.now();
-                    
                     await batch.commit();
                     window.ui.showToast(`${result.length} perfiles importados`, 'success');
-                } catch (e) {
-                    window.ui.showToast(e.message, 'error');
-                } finally {
-                    window.ui.setLoading(false);
-                }
+                } catch (e) { window.ui.showToast(e.message, 'error'); } finally { window.ui.setLoading(false); }
             },
-
             processDocument: async (file) => {
+                if (window.state.role === 'consulta') return window.ui.showToast("Solo lectura", "error");
+                // ... (codigo existente processDocument con confirmacion visual)
                 if (!window.state.selectedInmate) return window.ui.showToast("Seleccione interno", 'error');
                 if (!file) return;
-
                 window.ui.setLoading(true, "Analizando documento...");
                 try {
                     let text = "";
@@ -396,275 +503,183 @@
                             window.ui.setLoading(true, "Aplicando OCR (Lento)...");
                             text = await window.helpers.performOCR(file);
                         }
-                    } else {
-                        text = await window.helpers.performOCR(file);
-                    }
-
+                    } else { text = await window.helpers.performOCR(file); }
                     if (text.length < 10) {
                         window.ui.setLoading(false); 
-                        window.ui.showConfirm(
-                            "Lectura Difícil Detectada", 
-                            "El escaneo automático falló. ¿Desea que la IA analice la imagen visualmente?",
-                            async () => {
-                                await window.logic.processDocumentWithVision(file);
-                            }
-                        );
+                        window.ui.showConfirm("Lectura Difícil Detectada", "El escaneo automático falló. ¿Desea que la IA analice la imagen visualmente?", async () => { await window.logic.processDocumentWithVision(file); });
                         return; 
                     }
-
                     window.ui.setLoading(true, "Interpretando con IA...");
-                    const analysis = await window.helpers.callGeminiJSON(`
-                        Analiza texto judicial. JSON exacto:
-                        {"documentDate": "YYYY-MM-DD", "documentType": "Tipo", "keyFindings": "Resumen 2 lineas"}
-                        Texto: ${text.substring(0, 15000)}
-                    `);
-
+                    const analysis = await window.helpers.callGeminiJSON(`Analiza texto judicial. JSON exacto: {"documentDate": "YYYY-MM-DD", "documentType": "Tipo", "keyFindings": "Resumen 2 lineas"} Texto: ${text.substring(0, 15000)}`);
                     await window.logic.saveDocumentToProfile(file, analysis);
-
-                } catch (e) {
-                    console.error(e);
-                    window.ui.showToast("Error: " + e.message, 'error');
-                } finally {
-                    if (window.state.isProcessing) window.ui.setLoading(false);
-                }
+                } catch (e) { console.error(e); window.ui.showToast("Error: " + e.message, 'error'); } finally { if (window.state.isProcessing) window.ui.setLoading(false); }
             },
-
             processDocumentWithVision: async (file) => {
                 window.ui.setLoading(true, "Analizando visualmente con Gemini Vision...");
                 try {
                     let base64Img = "";
-                    if (file.type === 'application/pdf') {
-                        base64Img = await window.helpers.pdfToImageBase64(file);
-                    } else {
-                        base64Img = await window.helpers.fileToBase64(file);
-                    }
-
-                    const analysis = await window.helpers.callGeminiVisionJSON(`
-                        Analiza esta imagen de un documento legal. Extrae la información en JSON exacto:
-                        {"documentDate": "YYYY-MM-DD", "documentType": "Tipo", "keyFindings": "Resumen 2 lineas"}
-                    `, base64Img);
-
+                    if (file.type === 'application/pdf') base64Img = await window.helpers.pdfToImageBase64(file);
+                    else base64Img = await window.helpers.fileToBase64(file);
+                    const analysis = await window.helpers.callGeminiVisionJSON(`Analiza esta imagen. Extrae: {"documentDate": "YYYY-MM-DD", "documentType": "Tipo", "keyFindings": "Resumen 2 lineas"}`, base64Img);
                     await window.logic.saveDocumentToProfile(file, analysis);
-
-                } catch (e) {
-                    console.error("Vision Error:", e);
-                    window.ui.showToast("Error en análisis visual: " + e.message, 'error');
-                } finally {
-                    window.ui.setLoading(false);
-                }
+                } catch (e) { window.ui.showToast("Error en análisis visual: " + e.message, 'error'); } finally { window.ui.setLoading(false); }
             },
-
             saveDocumentToProfile: async (file, analysis) => {
                 window.ui.setLoading(true, "Subiendo archivo...");
                 const ref = firebase.storage().ref().child(`docs/${window.state.selectedInmate.id}/${Date.now()}_${file.name}`);
                 await ref.put(file);
                 const url = await ref.getDownloadURL();
-
-                // Marcar tiempo de actualización local ANTES del update
                 window.state.lastLocalUpdate = Date.now();
-
                 await firebase.firestore().collection('inmate_profiles').doc(window.state.selectedInmate.id).update({
                     documents: firebase.firestore.FieldValue.arrayUnion({ ...analysis, url, uploadedAt: new Date().toISOString() })
                 });
-                
+                window.logic.logAudit(window.state.selectedInmate.id, "Documento Agregado", `Archivo: ${file.name}. Tipo: ${analysis.documentType}`);
                 window.app.selectInmate(window.state.selectedInmate.id);
-                window.ui.setLoading(false); // Forzar cierre de loader antes del toast
+                window.ui.setLoading(false);
                 window.ui.showToast("Documento agregado con éxito", 'success');
             },
-
             deleteDocument: (docUrl) => {
-                window.ui.showConfirm(
-                    "Eliminar Evidencia", 
-                    "¿Está absolutamente seguro de eliminar este documento? Esta acción eliminará el registro y el archivo de forma permanente.", 
-                    async () => {
-                        window.ui.setLoading(true, "Eliminando evidencia...");
-                        try {
-                            const inmateId = window.state.selectedInmate.id;
-                            const docRef = firebase.firestore().collection('inmate_profiles').doc(inmateId);
+                // RBAC: Solo Juez puede borrar
+                if (window.state.role !== 'juez') return window.ui.showToast("Permiso denegado: Solo Juez puede eliminar.", "error");
 
-                            const snapshot = await docRef.get();
-                            const currentDocs = snapshot.data().documents || [];
-                            const updatedDocs = currentDocs.filter(d => d.url !== docUrl);
-
-                            window.state.lastLocalUpdate = Date.now();
-                            await docRef.update({ documents: updatedDocs });
-
-                            try {
-                                await firebase.storage().refFromURL(docUrl).delete();
-                            } catch (storageErr) {
-                                console.warn("Archivo ya no existía en storage", storageErr);
-                            }
-
-                            window.ui.showToast("Documento eliminado correctamente", "success");
-                            window.state.selectedInmate.documents = updatedDocs;
-                            window.app.renderInmateDetail();
-
-                        } catch (e) {
-                            console.error(e);
-                            window.ui.showToast("Error al eliminar: " + e.message, 'error');
-                        } finally {
-                            window.ui.setLoading(false);
+                window.ui.showConfirm("Eliminar Evidencia", "¿Está absolutamente seguro?", async () => {
+                    window.ui.setLoading(true, "Eliminando evidencia...");
+                    try {
+                        const inmateId = window.state.selectedInmate.id;
+                        const docRef = firebase.firestore().collection('inmate_profiles').doc(inmateId);
+                        const snapshot = await docRef.get();
+                        const currentDocs = snapshot.data().documents || [];
+                        
+                        const docToDelete = currentDocs.find(d => d.url === docUrl);
+                        let fileName = "Desconocido"; let docType = "Documento";
+                        if (docToDelete) {
+                            docType = docToDelete.documentType || "Documento";
+                            try { const path = decodeURIComponent(docUrl.split('/o/')[1].split('?')[0]); const fullName = path.split('/').pop(); fileName = fullName.split('_').slice(1).join('_') || fullName; } catch (e) {}
                         }
-                    }
-                );
-            },
 
+                        const updatedDocs = currentDocs.filter(d => d.url !== docUrl);
+                        window.state.lastLocalUpdate = Date.now();
+                        await docRef.update({ documents: updatedDocs });
+                        try { await firebase.storage().refFromURL(docUrl).delete(); } catch (e) {}
+                        window.logic.logAudit(inmateId, "Documento Eliminado", `Archivo: ${fileName}. Tipo: ${docType}`);
+                        window.ui.showToast(`Archivo "${fileName}" eliminado`, "success");
+                        window.state.selectedInmate.documents = updatedDocs;
+                        window.app.renderInmateDetail();
+                    } catch (e) { window.ui.showToast("Error: " + e.message, 'error'); } finally { window.ui.setLoading(false); }
+                });
+            },
             toggleStatus: (id, currentStatusRaw) => {
+                // RBAC: Consulta no puede cambiar estado
+                if (window.state.role === 'consulta') return window.ui.showToast("Solo lectura", "error");
+
                 const currentStatus = (currentStatusRaw && currentStatusRaw !== 'undefined') ? currentStatusRaw : 'Activo';
                 const newStatus = currentStatus === 'Activo' ? 'Libertad Definitiva' : 'Activo';
-                const message = `¿Desea cambiar el estado del interno de "${currentStatus}" a "${newStatus}"?`;
-                
-                window.ui.showConfirm(
-                    "Cambio de Estado", 
-                    message,
-                    async () => {
-                        try {
-                            window.state.lastLocalUpdate = Date.now();
-                            await firebase.firestore().collection('inmate_profiles').doc(id).update({
-                                status: newStatus
-                            });
-                            window.ui.showToast(`Estado actualizado a: ${newStatus}`, 'success');
-                            if (window.state.selectedInmate && window.state.selectedInmate.id === id) {
-                                window.state.selectedInmate.status = newStatus;
-                                window.app.renderInmateDetail();
-                            }
-                        } catch (e) {
-                            window.ui.showToast("Error actualizando estado", 'error');
-                        }
-                    }
-                );
+                window.ui.showConfirm("Cambio de Estado", `¿Desea cambiar el estado a "${newStatus}"?`, async () => {
+                    try {
+                        window.state.lastLocalUpdate = Date.now();
+                        await firebase.firestore().collection('inmate_profiles').doc(id).update({ status: newStatus });
+                        window.logic.logAudit(id, "Cambio de Estado", `De ${currentStatus} a ${newStatus}`);
+                        window.ui.showToast(`Estado actualizado: ${newStatus}`, 'success');
+                        if (window.state.selectedInmate?.id === id) { window.state.selectedInmate.status = newStatus; window.app.renderInmateDetail(); }
+                    } catch (e) { window.ui.showToast("Error actualizando estado", 'error'); }
+                });
             }
         };
 
-        // APP UI CONTROLLER (Global)
         window.app = {
             login: async (e) => {
                 e.preventDefault();
-                try {
-                    await firebase.auth().signInWithEmailAndPassword(e.target.email.value, e.target.password.value);
-                } catch (error) {
-                    window.ui.showToast(error.message, 'error');
-                }
-            },
+                // GUARDAR PREFERENCIA DE ROL SELECCIONADO
+                const role = document.getElementById('role-select').value;
+                localStorage.setItem('user_role_pref', role);
 
+                try { await firebase.auth().signInWithEmailAndPassword(e.target.email.value, e.target.password.value); } 
+                catch (error) { window.ui.showToast(error.message, 'error'); }
+            },
             logout: () => firebase.auth().signOut(),
-
             subscribeToInmates: () => {
-                const db = firebase.firestore();
-                db.collection('inmate_profiles').orderBy('fullName')
-                    .onSnapshot((snapshot) => {
-                        snapshot.docChanges().forEach((change) => {
-                            // Ignorar cambios locales inmediatos
-                            if (!change.doc.metadata.hasPendingWrites) {
-                                
-                                // ANTI-ECO: Si el cambio ocurrió hace menos de 2 seg y yo hice una acción, ignorar.
-                                if (window.state.lastLocalUpdate && (Date.now() - window.state.lastLocalUpdate < 2000)) {
-                                    console.log("Ignorando notificación propia (Anti-Eco)");
-                                    return;
-                                }
-
-                                const newData = change.doc.data();
-                                
-                                if (change.type === 'modified') {
-                                    const prevData = window.state.inmates.find(i => i.id === change.doc.id);
-                                    if (prevData) {
-                                        const newDocsCount = newData.documents?.length || 0;
-                                        const oldDocsCount = prevData.documents?.length || 0;
-                                        
-                                        // NUEVO TEXTO DE NOTIFICACIÓN SOLICITADO
-                                        if (newDocsCount > oldDocsCount) {
-                                            window.ui.showToast(`🔔 Actualización: Se agregaron documentos nuevos en el perfil del interno ${newData.fullName}`, 'update');
-                                        }
-
-                                        if (newData.status !== prevData.status) {
-                                            window.ui.showToast(`🔔 Estado: ${newData.fullName} ahora está "${newData.status}"`, 'update');
-                                        }
-                                    }
-                                }
-                                
-                                if (change.type === 'added' && window.state.inmates.length > 0) {
-                                    window.ui.showToast(`🔔 Nuevo Legajo: Se ha ingresado a ${newData.fullName}`, 'update');
+                firebase.firestore().collection('inmate_profiles').orderBy('fullName').onSnapshot((snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (!change.doc.metadata.hasPendingWrites) {
+                            if (window.state.lastLocalUpdate && (Date.now() - window.state.lastLocalUpdate < 2000)) return;
+                            const newData = change.doc.data();
+                            if (change.type === 'modified') {
+                                const prevData = window.state.inmates.find(i => i.id === change.doc.id);
+                                if (prevData) {
+                                    if ((newData.documents?.length || 0) > (prevData.documents?.length || 0)) window.ui.showToast(`🔔 Actualización: Se agregaron documentos nuevos en el perfil de ${newData.fullName}`, 'update');
+                                    if (newData.status !== prevData.status) window.ui.showToast(`🔔 Estado: ${newData.fullName} ahora está "${newData.status}"`, 'update');
                                 }
                             }
-                        });
-
-                        window.state.inmates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        window.app.updateStats(); // ACTUALIZAR ESTADISTICAS
-                        window.app.refreshInmateList();
-                        
-                        if(window.state.selectedInmate) {
-                            const updated = window.state.inmates.find(i => i.id === window.state.selectedInmate.id);
-                            if(updated) {
-                                window.state.selectedInmate = updated;
-                                window.app.renderInmateDetail();
-                            }
+                            if (change.type === 'added' && window.state.inmates.length > 0) window.ui.showToast(`🔔 Nuevo Legajo: ${newData.fullName}`, 'update');
                         }
-                    }, (error) => {
-                        console.error(error);
                     });
-            },
-
-            updateStats: () => {
-                const total = window.state.inmates.length;
-                // Considerar 'Activo' o undefined como activo (por compatibilidad hacia atras)
-                const active = window.state.inmates.filter(i => !i.status || i.status === 'Activo').length;
-                
-                const totalEl = document.getElementById('total-count');
-                const activeEl = document.getElementById('active-count');
-                
-                if (totalEl) totalEl.textContent = total;
-                if (activeEl) activeEl.textContent = active;
-            },
-
-            selectInmate: (id) => {
-                window.state.selectedInmate = window.state.inmates.find(i => i.id === id);
-                window.app.renderInmateDetail();
-            },
-
-            createManualInmate: () => {
-                // REEMPLAZO DE PROMPT POR MODAL
-                window.ui.showInput("Crear Nuevo Perfil", "Ingrese nombre completo del interno:", async (name) => {
-                    try {
-                        const db = firebase.firestore();
-                        const docRef = await db.collection('inmate_profiles').add({
-                            fullName: name,
-                            inmateId: 'MAN-' + Date.now().toString().slice(-6),
-                            crimeSummary: 'Perfil manual',
-                            status: 'Activo',
-                            documents: [],
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        
-                        window.state.lastLocalUpdate = Date.now();
-                        window.ui.showToast("Perfil creado", 'success');
-                        window.app.selectInmate(docRef.id);
-                    } catch (err) {
-                        window.ui.showToast("Error creando perfil", 'error');
+                    window.state.inmates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    window.app.updateStats();
+                    window.app.refreshInmateList();
+                    if(window.state.selectedInmate) {
+                        const updated = window.state.inmates.find(i => i.id === window.state.selectedInmate.id);
+                        if(updated) { window.state.selectedInmate = updated; window.app.renderInmateDetail(); }
                     }
                 });
             },
-
+            updateStats: () => {
+                const total = window.state.inmates.length;
+                const active = window.state.inmates.filter(i => !i.status || i.status === 'Activo').length;
+                const totalEl = document.getElementById('total-count');
+                const activeEl = document.getElementById('active-count');
+                if (totalEl) totalEl.textContent = total;
+                if (activeEl) activeEl.textContent = active;
+            },
+            selectInmate: (id) => { window.state.selectedInmate = window.state.inmates.find(i => i.id === id); window.app.renderInmateDetail(); },
+            createManualInmate: () => {
+                if (window.state.role === 'consulta') return window.ui.showToast("Permiso denegado", "error");
+                window.ui.showInput("Crear Nuevo Perfil", "Ingrese nombre completo:", async (name) => {
+                    try {
+                        const db = firebase.firestore();
+                        const docRef = await db.collection('inmate_profiles').add({
+                            fullName: name, inmateId: 'MAN-' + Date.now().toString().slice(-6), crimeSummary: 'Perfil manual',
+                            status: 'Activo', documents: [], createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        window.state.lastLocalUpdate = Date.now();
+                        window.logic.logAudit(docRef.id, "Creación de Perfil", `Nombre: ${name}`);
+                        window.ui.showToast("Perfil creado", 'success');
+                        window.app.selectInmate(docRef.id);
+                    } catch (err) { window.ui.showToast("Error creando perfil", 'error'); }
+                });
+            },
             renderLogin: () => {
                 document.getElementById('app-container').innerHTML = `
                     <div class="w-full h-full flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] overflow-y-auto">
                         <div class="bg-slate-900 p-8 rounded-xl border border-slate-700 shadow-2xl w-96 m-4">
                             <h2 class="text-2xl font-bold text-white mb-2">Acceso Seguro</h2>
                             <form onsubmit="window.app.login(event)" class="space-y-4 mt-6">
-                                <input type="email" name="email" placeholder="Email" required class="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none">
-                                <input type="password" name="password" placeholder="Contraseña" required class="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none">
-                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition">Ingresar</button>
+                                <div>
+                                    <label class="text-xs text-slate-500 block mb-1">Email</label>
+                                    <input type="email" name="email" required class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-500 block mb-1">Contraseña</label>
+                                    <input type="password" name="password" required class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-500 block mb-1">Rol (Simulación)</label>
+                                    <select id="role-select" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none">
+                                        <option value="juez">Juez (Total)</option>
+                                        <option value="secretario">Secretario (Edición)</option>
+                                        <option value="consulta">Consulta (Lectura)</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded transition">Ingresar</button>
                             </form>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             },
-
             renderDashboard: () => {
-                const container = document.getElementById('app-container');
-                container.innerHTML = `
+                const canEdit = window.state.role !== 'consulta';
+                
+                document.getElementById('app-container').innerHTML = `
                     <aside class="w-full md:w-80 bg-slate-900 border-r border-slate-800 flex flex-col h-1/3 md:h-full flex-none overflow-hidden z-10">
                         <div class="p-4 border-b border-slate-800 space-y-3 bg-slate-900">
-                            <!-- STATS ROW -->
                             <div class="flex justify-between items-center px-1 mb-1">
                                 <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Estadísticas</span>
                                 <div class="flex gap-3 text-xs font-mono">
@@ -672,125 +687,80 @@
                                     <span class="text-green-500/80">Activos: <b id="active-count" class="text-green-400">...</b></span>
                                 </div>
                             </div>
-
-                            <input type="text" placeholder="Buscar..." 
-                                oninput="window.app.handleSearch(this.value)"
-                                class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none">
+                            <input type="text" placeholder="Buscar..." oninput="window.app.handleSearch(this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none">
                             
-                            <div class="flex gap-2">
-                                <button onclick="window.app.createManualInmate()" class="flex-1 bg-slate-800 text-xs text-white py-2 rounded border border-slate-600 hover:bg-slate-700">+ Nuevo</button>
-                            </div>
-
-                            <div id="mass-upload-zone" class="drop-zone p-3 rounded bg-slate-950/50 border-dashed border-slate-600 text-center cursor-pointer">
-                                <p class="text-[10px] text-slate-400">📂 Carga Masiva (PDF)</p>
-                                <input type="file" id="mass-input" accept=".pdf" class="hidden" onchange="window.logic.processMassList(this.files[0])">
+                            <!-- CONTROLES DE GESTIÓN (Solo si puede editar) -->
+                            <div class="${canEdit ? '' : 'hidden'} space-y-3">
+                                <div class="flex gap-2"><button onclick="window.app.createManualInmate()" class="flex-1 bg-slate-800 text-xs text-white py-2 rounded border border-slate-600 hover:bg-slate-700">+ Nuevo</button></div>
+                                <div id="mass-upload-zone" class="drop-zone p-3 rounded bg-slate-950/50 border-dashed border-slate-600 text-center cursor-pointer"><p class="text-[10px] text-slate-400">📂 Carga Masiva (PDF)</p><input type="file" id="mass-input" accept=".pdf" class="hidden" onchange="window.logic.processMassList(this.files[0])"></div>
                             </div>
                         </div>
                         <div id="inmate-list" class="flex-1 overflow-y-auto p-2 space-y-1 scroll-smooth"></div>
                     </aside>
-
                     <section id="main-content" class="flex-1 bg-slate-950 relative flex flex-col h-2/3 md:h-full overflow-hidden min-w-0">
-                        <div class="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 text-center">
-                            <p>Seleccione un interno del listado.</p>
-                        </div>
-                    </section>
-                `;
-                window.ui.setupDragAndDrop('mass-upload-zone', (files) => window.logic.processMassList(files[0]));
-                // Actualizar stats iniciales si ya hay datos cargados
+                        <div class="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 text-center"><p>Seleccione un interno del listado.</p></div>
+                    </section>`;
+                if(canEdit) window.ui.setupDragAndDrop('mass-upload-zone', (files) => window.logic.processMassList(files[0]));
                 if(window.state.inmates.length > 0) window.app.updateStats();
             },
-
             refreshInmateList: () => {
-                const listEl = document.getElementById('inmate-list');
-                if (!listEl) return;
-                
-                const filtered = window.state.inmates.filter(i => 
-                    i.fullName.toLowerCase().includes(window.state.searchQuery.toLowerCase()) || 
-                    (i.inmateId && i.inmateId.includes(window.state.searchQuery))
-                );
-
-                listEl.innerHTML = filtered.map(i => {
+                const filtered = window.state.inmates.filter(i => i.fullName.toLowerCase().includes(window.state.searchQuery.toLowerCase()) || (i.inmateId && i.inmateId.includes(window.state.searchQuery)));
+                document.getElementById('inmate-list').innerHTML = filtered.map(i => {
                     const isFree = i.status === 'Libertad Definitiva';
-                    const icon = isFree ? '🕊️' : '🙋';
-                    const nameColor = isFree ? 'text-green-400' : 'text-slate-200';
-                    const borderColor = window.state.selectedInmate?.id === i.id ? 'border-blue-500/50' : 'border-transparent';
-                    
                     return `
-                    <div onclick="window.app.selectInmate('${i.id}')" 
-                        class="p-3 rounded border ${borderColor} cursor-pointer hover:bg-slate-800 transition ${window.state.selectedInmate?.id === i.id ? 'bg-blue-900/20' : ''}">
-                        <h3 class="text-sm font-bold ${nameColor} truncate flex items-center gap-2">
-                            <span>${icon}</span> 
-                            ${i.fullName}
-                        </h3>
-                        <div class="flex justify-between items-center mt-1 pl-6">
-                            <span class="text-[10px] text-slate-500 font-mono">${i.inmateId || 'N/A'}</span>
-                            <span class="text-[9px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">${i.documents?.length || 0} Docs</span>
-                        </div>
-                    </div>
-                `}).join('');
+                    <div onclick="window.app.selectInmate('${i.id}')" class="p-3 rounded border ${window.state.selectedInmate?.id === i.id ? 'bg-blue-900/20 border-blue-500/50' : 'border-transparent'} cursor-pointer hover:bg-slate-800 transition">
+                        <h3 class="text-sm font-bold ${isFree ? 'text-green-400' : 'text-slate-200'} truncate flex items-center gap-2"><span>${isFree ? '🕊️' : '🙋'}</span> ${i.fullName}</h3>
+                        <div class="flex justify-between items-center mt-1 pl-6"><span class="text-[10px] text-slate-500 font-mono">${i.inmateId || 'N/A'}</span><span class="text-[9px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">${i.documents?.length || 0} Docs</span></div>
+                    </div>`;
+                }).join('');
             },
-
             renderInmateDetail: () => {
                 const i = window.state.selectedInmate;
-                const container = document.getElementById('main-content');
                 if (!i) return;
-
                 const isFree = i.status === 'Libertad Definitiva';
-                const statusColor = isFree ? 'bg-green-900/50 text-green-400 border-green-900' : 'bg-blue-900/50 text-blue-400 border-blue-900';
+                const role = window.state.role;
+                const canEdit = role !== 'consulta';
+                const canAudit = role === 'juez';
+                const canDelete = role === 'juez';
 
-                container.innerHTML = `
+                document.getElementById('main-content').innerHTML = `
                     <div class="flex-none p-6 border-b border-slate-800 bg-slate-900/50">
                         <div class="flex justify-between items-start mb-2">
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-3">
                                 <h2 class="text-xl md:text-2xl font-bold text-white">${i.fullName}</h2>
-                                <button onclick="window.logic.toggleStatus('${i.id}', '${i.status || 'Activo'}')" 
-                                    class="text-xs ${statusColor} px-2 py-1 rounded border hover:opacity-80 transition cursor-pointer font-mono select-none" title="Clic para cambiar estado">
-                                    ${i.status || 'Activo'}
+                                <button ${canEdit ? '' : 'disabled'} onclick="window.logic.toggleStatus('${i.id}', '${i.status || 'Activo'}')" class="text-xs ${isFree ? 'bg-green-900/50 text-green-400 border-green-900' : 'bg-blue-900/50 text-blue-400 border-blue-900'} px-2 py-1 rounded border hover:opacity-80 transition cursor-pointer font-mono select-none ${canEdit ? '' : 'opacity-50 cursor-not-allowed'}" title="Clic para cambiar estado">${i.status || 'Activo'}</button>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="window.ui.openChat()" class="text-xs flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded shadow transition">
+                                    🤖 <span class="hidden md:inline">Interrogar IA</span>
                                 </button>
+                                ${canAudit ? `<button onclick="window.ui.openAudit('${i.id}')" class="text-xs flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-600 transition">📜 <span class="hidden md:inline">Historial</span></button>` : ''}
                             </div>
                         </div>
                         <p class="text-slate-400 text-sm line-clamp-2">${i.crimeSummary || 'Sin resumen.'}</p>
                     </div>
-
                     <div class="flex-1 overflow-y-auto p-6 bg-slate-950 scroll-smooth">
+                        ${canEdit ? `
                         <div id="doc-upload-zone" class="drop-zone border-2 border-dashed border-slate-700 rounded-lg p-6 mb-6 flex flex-col items-center justify-center text-slate-500 hover:text-slate-300 hover:border-slate-500 cursor-pointer transition">
                             <p class="text-sm font-medium">Arrastre Documento (PDF/IMG)</p>
                             <input type="file" id="doc-input" class="hidden" accept=".pdf,.jpg,.png,.jpeg" onchange="window.logic.processDocument(this.files[0])">
-                        </div>
-
+                        </div>` : ''}
+                        
                         <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 pb-10">
                             ${(i.documents || []).map(doc => `
                                 <div class="bg-slate-900 border border-slate-800 rounded p-4 hover:border-blue-500/50 transition relative group">
-                                    <div class="flex justify-between mb-2 pr-6">
-                                        <span class="text-[10px] font-bold text-blue-400 bg-blue-900/20 px-2 py-0.5 rounded">${doc.documentType || 'DOC'}</span>
-                                        <span class="text-[10px] text-slate-500">${doc.documentDate || ''}</span>
-                                    </div>
+                                    <div class="flex justify-between mb-2 pr-6"><span class="text-[10px] font-bold text-blue-400 bg-blue-900/20 px-2 py-0.5 rounded">${doc.documentType || 'DOC'}</span><span class="text-[10px] text-slate-500">${doc.documentDate || ''}</span></div>
                                     <p class="text-xs text-slate-300 mb-3 leading-relaxed">${doc.keyFindings || '...'}</p>
-                                    
                                     <div class="flex justify-between items-center mt-2 pt-2 border-t border-slate-800">
-                                        <a href="${doc.url}" target="_blank" class="text-[11px] text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1">
-                                            Ver Archivo <span class="text-lg">↗</span>
-                                        </a>
-                                        <button onclick="window.logic.deleteDocument('${doc.url}')" 
-                                            class="text-slate-600 hover:text-red-500 transition p-1 hover:bg-slate-800 rounded flex items-center gap-1" title="Eliminar documento">
-                                            <span class="text-[10px] uppercase font-bold">Eliminar</span>
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                        </button>
+                                        <a href="${doc.url}" target="_blank" class="text-[11px] text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1">Ver Archivo <span class="text-lg">↗</span></a>
+                                        ${canDelete ? `<button onclick="window.logic.deleteDocument('${doc.url}')" class="text-slate-600 hover:text-red-500 transition p-1 hover:bg-slate-800 rounded flex items-center gap-1" title="Eliminar documento"><span class="text-[10px] uppercase font-bold">Eliminar</span><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>` : ''}
                                     </div>
-                                </div>
-                            `).join('')}
+                                </div>`).join('')}
                         </div>
-                    </div>
-                `;
-                window.ui.setupDragAndDrop('doc-upload-zone', (files) => window.logic.processDocument(files[0]));
+                    </div>`;
+                if(canEdit) window.ui.setupDragAndDrop('doc-upload-zone', (files) => window.logic.processDocument(files[0]));
             },
-
-            handleSearch: (val) => {
-                window.state.searchQuery = val;
-                window.app.refreshInmateList();
-            }
+            handleSearch: (val) => { window.state.searchQuery = val; window.app.refreshInmateList(); }
         };
     </script>
 </body>
