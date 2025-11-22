@@ -23,7 +23,7 @@
     <!-- TESSERACT.JS v5 -->
     <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
 
-    <!-- MARKDOWN PARSER (Para respuestas de IA) -->
+    <!-- MARKDOWN PARSER -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <style>
@@ -60,6 +60,7 @@
         .chat-bubble { max-width: 80%; border-radius: 12px; padding: 10px; font-size: 0.9rem; }
         .chat-user { background-color: #1e293b; align-self: flex-end; color: white; }
         .chat-ai { background-color: #172554; align-self: flex-start; color: #bfdbfe; border: 1px solid #1e3a8a; }
+        .chat-system { background-color: #064e3b; align-self: center; color: #6ee7b7; border: 1px dashed #059669; font-size: 0.75rem; }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden bg-slate-950">
@@ -103,26 +104,45 @@
         <div id="audit-list" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
     </div>
 
-    <!-- MODAL CHAT IA (RAG) -->
+    <!-- MODAL CHAT IA (RAG MEJORADO) -->
     <div id="chat-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-2xl h-[600px] flex flex-col overflow-hidden">
-            <div class="p-4 border-b border-slate-800 bg-slate-950 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-blue-400 flex items-center gap-2">
-                    🤖 Asistente Jurídico IA
-                    <span class="text-xs text-slate-500 font-normal ml-2">(Analizando legajo activo)</span>
-                </h3>
-                <button onclick="window.ui.closeChat()" class="text-slate-400 hover:text-white">✕</button>
-            </div>
-            <div id="chat-history" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-slate-900/50">
-                <div class="chat-ai chat-bubble">
-                    Hola. He analizado los documentos de este legajo. ¿Qué deseas saber?
+        <div class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-5xl h-[80vh] flex overflow-hidden">
+            
+            <!-- SIDEBAR DOCUMENTOS CHAT -->
+            <div class="w-1/3 bg-slate-950 border-r border-slate-800 flex flex-col hidden md:flex">
+                <div class="p-4 border-b border-slate-800 bg-slate-900">
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">Documentos del Legajo</h3>
+                    <p class="text-[10px] text-slate-500 mt-1">Haga clic en "👁️" para lectura profunda.</p>
+                </div>
+                <div id="chat-docs-list" class="flex-1 overflow-y-auto p-2 space-y-2">
+                    <!-- Lista inyectada por JS -->
                 </div>
             </div>
-            <div class="p-4 border-t border-slate-800 bg-slate-950 flex gap-2">
-                <input type="text" id="chat-input" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:border-blue-500 outline-none" placeholder="Ej: ¿En qué fecha se otorgó la libertad?..." onkeypress="if(event.key === 'Enter') window.logic.sendChatMessage()">
-                <button onclick="window.logic.sendChatMessage()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
-                </button>
+
+            <!-- AREA DE CHAT -->
+            <div class="flex-1 flex flex-col bg-slate-900 relative">
+                <div class="p-4 border-b border-slate-800 bg-slate-900 flex justify-between items-center shadow-md z-10">
+                    <div>
+                        <h3 class="text-lg font-bold text-blue-400 flex items-center gap-2">
+                            🤖 Asistente Jurídico
+                        </h3>
+                        <p class="text-[10px] text-slate-500" id="chat-context-status">Contexto: Resúmenes básicos</p>
+                    </div>
+                    <button onclick="window.ui.closeChat()" class="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 p-1.5 rounded transition">✕</button>
+                </div>
+                
+                <div id="chat-history" class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-slate-900/50">
+                    <div class="chat-ai chat-bubble">
+                        Hola. Tengo acceso a los resúmenes de este legajo. Si necesitas un dato muy específico que no encuentras, usa el panel izquierdo para pedirme que <b>lea a fondo</b> un documento completo.
+                    </div>
+                </div>
+                
+                <div class="p-4 border-t border-slate-800 bg-slate-900 flex gap-2">
+                    <input type="text" id="chat-input" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:border-blue-500 outline-none shadow-inner" placeholder="Escribe tu pregunta jurídica aquí..." onkeypress="if(event.key === 'Enter') window.logic.sendChatMessage()">
+                    <button onclick="window.logic.sendChatMessage()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition shadow-lg shadow-blue-900/20">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -169,17 +189,18 @@
             appId: "1:449122558886:web:b440366cb44f8ec2252567"
         };
 
-        const GEMINI_API_KEY = "AIzaSyD75ul9bSgckdpm35z2WjRUPtS_z4RWAfY";
-        const GEMINI_MODEL = "gemini-2.5-flash";
+        const apiKey = "AIzaSyD62Az9yY_6gP2Ja44PNWG1iMKs2uE3D_E";
+        const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
 
         window.state = {
             user: null,
-            role: 'consulta', // juez, secretario, consulta
+            role: 'consulta',
             inmates: [],
             selectedInmate: null,
             isProcessing: false,
             searchQuery: "",
-            lastLocalUpdate: 0
+            lastLocalUpdate: 0,
+            chatFullContext: ""
         };
 
         window.onload = function() {
@@ -191,7 +212,6 @@
                     window.ui.setLoading(false);
 
                     if (user) {
-                        // RECUPERAR ROL (Simulado por localStorage para demo, en prod sería Firestore)
                         const storedRole = localStorage.getItem('user_role_pref') || 'consulta';
                         window.state.role = storedRole;
                         
@@ -199,7 +219,6 @@
                         document.getElementById('user-email').textContent = user.email;
                         document.getElementById('user-role-badge').textContent = storedRole;
                         
-                        // Colores de badge según rol
                         const badge = document.getElementById('user-role-badge');
                         if (storedRole === 'juez') badge.className = "text-[10px] bg-yellow-900/50 text-yellow-400 px-2 py-0.5 rounded uppercase font-bold tracking-wider border border-yellow-700";
                         else if (storedRole === 'secretario') badge.className = "text-[10px] bg-blue-900/50 text-blue-400 px-2 py-0.5 rounded uppercase font-bold tracking-wider border border-blue-700";
@@ -286,18 +305,12 @@
             hideInput: () => { document.getElementById('input-modal').classList.add('hidden'); window.ui.inputCallback = null; },
             
             openAudit: async (inmateId) => {
-                // RBAC CHECK: Solo Juez
-                if (window.state.role !== 'juez') {
-                    window.ui.showToast("Acceso denegado: Solo Jueces pueden auditar.", "error");
-                    return;
-                }
-
+                if (window.state.role !== 'juez') return window.ui.showToast("Acceso denegado: Solo Jueces pueden auditar.", "error");
                 const drawer = document.getElementById('audit-drawer');
                 const overlay = document.getElementById('audit-overlay');
                 const list = document.getElementById('audit-list');
                 drawer.classList.remove('closed'); drawer.classList.add('open'); overlay.classList.remove('hidden');
                 list.innerHTML = '<div class="flex justify-center mt-10"><div class="loader"></div></div>';
-
                 try {
                     const snapshot = await firebase.firestore().collection('audit_logs').where('inmateId', '==', inmateId).get();
                     if (snapshot.empty) { list.innerHTML = '<p class="text-center text-slate-500 text-sm mt-10">Sin registros.</p>'; return; }
@@ -313,18 +326,43 @@
             },
             closeAudit: () => { document.getElementById('audit-drawer').classList.remove('open'); document.getElementById('audit-drawer').classList.add('closed'); document.getElementById('audit-overlay').classList.add('hidden'); },
 
-            // --- CHAT RAG UI ---
             openChat: () => {
                 document.getElementById('chat-modal').classList.remove('hidden');
                 document.getElementById('chat-input').focus();
+                window.state.chatFullContext = ""; 
+                window.ui.renderChatDocsList();
+                document.getElementById('chat-context-status').textContent = "Contexto: Resúmenes básicos";
+                document.getElementById('chat-context-status').className = "text-[10px] text-slate-500";
             },
             closeChat: () => document.getElementById('chat-modal').classList.add('hidden'),
             
+            renderChatDocsList: () => {
+                const list = document.getElementById('chat-docs-list');
+                const docs = window.state.selectedInmate?.documents || [];
+                
+                if(docs.length === 0) {
+                    list.innerHTML = '<p class="text-xs text-slate-600 text-center mt-4">Sin documentos.</p>';
+                    return;
+                }
+
+                list.innerHTML = docs.map((doc, idx) => `
+                    <div class="bg-slate-800 p-2 rounded border border-slate-700 hover:border-blue-500 transition flex justify-between items-center group">
+                        <div class="overflow-hidden">
+                            <div class="text-[10px] font-bold text-blue-400 truncate">${doc.documentType}</div>
+                            <div class="text-[9px] text-slate-500 truncate">${doc.documentDate || 'S/F'}</div>
+                        </div>
+                        <button onclick="window.logic.loadFullDocForChat('${doc.url}', ${idx})" 
+                            class="bg-slate-700 hover:bg-blue-600 text-white p-1.5 rounded shadow transition" title="Analizar a fondo este documento">
+                            👁️
+                        </button>
+                    </div>
+                `).join('');
+            },
+
             addChatMessage: (text, sender) => {
                 const history = document.getElementById('chat-history');
                 const div = document.createElement('div');
-                div.className = `chat-bubble ${sender === 'user' ? 'chat-user' : 'chat-ai'}`;
-                // Si es AI, parsear markdown simple
+                div.className = `chat-bubble ${sender === 'user' ? 'chat-user' : (sender === 'system' ? 'chat-system' : 'chat-ai')}`;
                 div.innerHTML = sender === 'ai' ? marked.parse(text) : text;
                 history.appendChild(div);
                 history.scrollTop = history.scrollHeight;
@@ -352,6 +390,16 @@
                 }
                 return fullText;
             },
+            extractFullTextPDF: async (arrayBuffer) => {
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                let fullText = "";
+                for (let i = 1; i <= Math.min(pdf.numPages, 50); i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    fullText += `--- PÁGINA ${i} ---\n` + content.items.map(item => item.str).join(' ') + "\n";
+                }
+                return fullText;
+            },
             performOCR: async (file) => {
                 let img = file;
                 if (file.type === 'application/pdf') img = await window.helpers.pdfToImageBase64(file);
@@ -359,6 +407,25 @@
                 const ret = await worker.recognize(img);
                 await worker.terminate();
                 return ret.data.text;
+            },
+            ocrFromBuffer: async (arrayBuffer) => {
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const worker = await Tesseract.createWorker('spa');
+                let fullText = "";
+                const maxPages = Math.min(pdf.numPages, 3);
+                for (let i = 1; i <= maxPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const viewport = page.getViewport({ scale: 2.0 });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width; 
+                    canvas.height = viewport.height;
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                    const img = canvas.toDataURL('image/png');
+                    const ret = await worker.recognize(img);
+                    fullText += `\n--- PÁGINA ${i} (OCR) ---\n` + ret.data.text;
+                }
+                await worker.terminate();
+                return fullText;
             },
             pdfToImageBase64: async (file) => {
                 const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
@@ -378,7 +445,7 @@
                 });
             },
             callGeminiJSON: async (prompt) => {
-                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -386,13 +453,16 @@
                         generationConfig: { responseMimeType: "application/json" }
                     })
                 });
-                if (!resp.ok) throw new Error("API IA Error");
+                if (!resp.ok) {
+                    const errText = await resp.text();
+                    throw new Error(`API IA Error (${resp.status}): ${errText}`);
+                }
                 const txt = (await resp.json()).candidates?.[0]?.content?.parts?.[0]?.text;
                 return JSON.parse(txt.replace(/```json|```/g, ''));
             },
             callGeminiVisionJSON: async (prompt, base64Image) => {
                 const base64Data = base64Image.split(',')[1];
-                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -400,18 +470,23 @@
                         generationConfig: { responseMimeType: "application/json" }
                     })
                 });
-                if (!resp.ok) throw new Error("API IA Vision Error");
+                if (!resp.ok) {
+                    const errText = await resp.text();
+                    throw new Error(`API IA Vision Error (${resp.status}): ${errText}`);
+                }
                 const txt = (await resp.json()).candidates?.[0]?.content?.parts?.[0]?.text;
                 return JSON.parse(txt.replace(/```json|```/g, ''));
             },
-            // RAG HELPER: TEXTO LIBRE
             callGeminiFreeText: async (prompt) => {
-                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                 });
-                if (!resp.ok) throw new Error("API IA Error");
+                if (!resp.ok) {
+                    const errText = await resp.text();
+                    throw new Error(`API IA Error (${resp.status}): ${errText}`);
+                }
                 return (await resp.json()).candidates?.[0]?.content?.parts?.[0]?.text;
             }
         };
@@ -425,7 +500,87 @@
                 } catch (e) { console.error("Error log:", e); }
             },
 
-            // --- LOGICA RAG ---
+            loadFullDocForChat: async (docUrl, idx) => {
+                window.ui.addChatMessage(`📥 Descargando y leyendo documento #${idx + 1}...`, 'system');
+                
+                try {
+                    let arrayBuffer;
+                    let mimeType;
+                    try {
+                        const response = await fetch(docUrl);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        const blob = await response.blob();
+                        arrayBuffer = await blob.arrayBuffer();
+                        mimeType = blob.type;
+                    } catch (fetchErr) {
+                        console.warn("Fetch error", fetchErr);
+                        throw new Error("No se pudo descargar el archivo (CORS/Network).");
+                    }
+                    
+                    const bufferForOCR = arrayBuffer.slice(0);
+                    let fullText = "";
+                    let source = "";
+
+                    // CASO 1: Es IMAGEN (JPG, PNG, etc)
+                    if (mimeType && mimeType.startsWith('image/')) {
+                         window.ui.addChatMessage(`🖼️ Imagen detectada. Iniciando OCR directo...`, 'system');
+                         // Convertir buffer a blob para pasarlo a Tesseract
+                         const imageBlob = new Blob([bufferForOCR], {type: mimeType});
+                         const worker = await Tesseract.createWorker('spa');
+                         const ret = await worker.recognize(imageBlob);
+                         await worker.terminate();
+                         fullText = ret.data.text;
+                         source = "OCR (Imagen)";
+                    } 
+                    // CASO 2: Es PDF (o desconocido que intentamos como PDF)
+                    else {
+                        try {
+                            fullText = await window.helpers.extractFullTextPDF(arrayBuffer);
+                            source = "Texto Nativo";
+
+                            // Si hay poco texto, quizás es un PDF escaneado
+                            if (fullText.length < 300) {
+                                window.ui.addChatMessage(`⚠️ Texto nativo insuficiente (${fullText.length} cars). Aplicando OCR a primeras 3 páginas...`, 'system');
+                                try {
+                                    fullText = await window.helpers.ocrFromBuffer(bufferForOCR);
+                                    source = "OCR (Escaneo PDF)";
+                                } catch (ocrErr) {
+                                    console.error("OCR Error details:", ocrErr);
+                                    throw new Error(`Falló el OCR: ${ocrErr.message || ocrErr}`);
+                                }
+                            }
+                        } catch (e) {
+                            // Si falla PDF.js, intentamos como imagen a la fuerza (Fallback)
+                            if (e.name === 'InvalidPDFException' || (e.message && e.message.includes('Invalid PDF'))) {
+                                window.ui.addChatMessage(`⚠️ Archivo no es un PDF válido. Intentando lectura visual...`, 'system');
+                                const imageBlob = new Blob([bufferForOCR]); // Blob genérico
+                                const worker = await Tesseract.createWorker('spa');
+                                const ret = await worker.recognize(imageBlob);
+                                await worker.terminate();
+                                fullText = ret.data.text;
+                                source = "OCR (Forzado)";
+                            } else {
+                                throw e;
+                            }
+                        }
+                    }
+
+                    if (!fullText || fullText.length < 50) throw new Error("Documento ilegible o vacío.");
+
+                    window.state.chatFullContext += `\n\n=== CONTENIDO COMPLETO DEL DOCUMENTO #${idx + 1} (${source}) ===\n${fullText}\n===================================\n`;
+                    
+                    window.ui.addChatMessage(`✅ Documento #${idx + 1} procesado (${source}) y memorizado (${fullText.length} caracteres).`, 'system');
+                    
+                    const statusEl = document.getElementById('chat-context-status');
+                    statusEl.textContent = "Contexto: Resúmenes + Documentos Completos cargados";
+                    statusEl.className = "text-[10px] text-green-400 font-bold animate-pulse";
+
+                } catch (e) {
+                    console.error(e);
+                    window.ui.addChatMessage(`❌ Error leyendo documento: ${e.message}`, 'system');
+                }
+            },
+
             sendChatMessage: async () => {
                 const input = document.getElementById('chat-input');
                 const question = input.value.trim();
@@ -434,26 +589,26 @@
                 window.ui.addChatMessage(question, 'user');
                 input.value = '';
 
-                // Construir Contexto RAG
                 const inmate = window.state.selectedInmate;
                 const docs = inmate.documents || [];
                 
-                let contextText = `Estás analizando el legajo judicial de ${inmate.fullName} (ID: ${inmate.inmateId}).\n\nDOCUMENTOS DISPONIBLES:\n`;
+                let contextText = `Estás analizando el legajo judicial de ${inmate.fullName} (ID: ${inmate.inmateId}).\n\n`;
                 
-                if (docs.length === 0) {
-                    contextText += "No hay documentos cargados en este legajo.\n";
-                } else {
-                    docs.forEach((d, i) => {
-                        contextText += `[Doc ${i+1}] Tipo: ${d.documentType}. Fecha: ${d.documentDate}. Resumen Clave: ${d.keyFindings}\n`;
-                    });
+                contextText += "--- RESÚMENES DISPONIBLES ---\n";
+                if (docs.length === 0) contextText += "No hay documentos cargados.\n";
+                else docs.forEach((d, i) => {
+                    contextText += `[Doc ${i+1}] Tipo: ${d.documentType}. Fecha: ${d.documentDate}. Resumen: ${d.keyFindings}\n`;
+                });
+
+                if (window.state.chatFullContext) {
+                    contextText += "\n--- CONTENIDO COMPLETO DE DOCUMENTOS CARGADOS ---\n" + window.state.chatFullContext;
                 }
 
-                const prompt = `${contextText}\n\nPREGUNTA DEL USUARIO: "${question}"\n\nINSTRUCCIONES: Responde basándote ÚNICAMENTE en la información de los documentos listados arriba. Si la información no está en los documentos, dilo. Cita el documento fuente (ej: "[Doc 1]") en tu respuesta.`;
+                const prompt = `${contextText}\n\nPREGUNTA DEL USUARIO: "${question}"\n\nINSTRUCCIONES: Responde basándote ÚNICAMENTE en la información provista arriba. Si la respuesta está en el contenido completo, sé detallado. Cita el documento fuente.`;
 
-                // Indicador de carga en chat
                 const loadingDiv = document.createElement('div');
                 loadingDiv.className = 'chat-bubble chat-ai animate-pulse';
-                loadingDiv.textContent = 'Analizando documentos...';
+                loadingDiv.textContent = 'Analizando...';
                 loadingDiv.id = 'chat-loading';
                 document.getElementById('chat-history').appendChild(loadingDiv);
 
@@ -463,14 +618,12 @@
                     window.ui.addChatMessage(answer, 'ai');
                 } catch (e) {
                     document.getElementById('chat-loading').remove();
-                    window.ui.addChatMessage("Error de conexión con la IA.", 'ai');
+                    window.ui.addChatMessage(`Error: ${e.message}`, 'ai');
                 }
             },
 
-            // ... (Resto de lógica anterior sin cambios mayores, solo integración de roles)
             processMassList: async (file) => {
                 if (window.state.role === 'consulta') return window.ui.showToast("Permiso denegado", "error");
-                // ... (codigo existente processMassList)
                 if (!file || file.type !== 'application/pdf') return window.ui.showToast('Use PDF para carga masiva', 'error');
                 window.ui.setLoading(true, "Procesando lista...");
                 try {
@@ -491,7 +644,6 @@
             },
             processDocument: async (file) => {
                 if (window.state.role === 'consulta') return window.ui.showToast("Solo lectura", "error");
-                // ... (codigo existente processDocument con confirmacion visual)
                 if (!window.state.selectedInmate) return window.ui.showToast("Seleccione interno", 'error');
                 if (!file) return;
                 window.ui.setLoading(true, "Analizando documento...");
@@ -510,7 +662,15 @@
                         return; 
                     }
                     window.ui.setLoading(true, "Interpretando con IA...");
-                    const analysis = await window.helpers.callGeminiJSON(`Analiza texto judicial. JSON exacto: {"documentDate": "YYYY-MM-DD", "documentType": "Tipo", "keyFindings": "Resumen 2 lineas"} Texto: ${text.substring(0, 15000)}`);
+                    const analysis = await window.helpers.callGeminiJSON(`
+                        Analiza texto judicial con rigor. 
+                        JSON exacto: {
+                            "documentDate": "YYYY-MM-DD", 
+                            "documentType": "Tipo (Sentencia, Informe, etc)", 
+                            "keyFindings": "Resumen detallado (aprox 80-100 palabras) que incluya: motivo principal, resolución o conclusión, fechas clave mencionadas y partes intervinientes si aplica."
+                        } 
+                        Texto: ${text.substring(0, 25000)}
+                    `);
                     await window.logic.saveDocumentToProfile(file, analysis);
                 } catch (e) { console.error(e); window.ui.showToast("Error: " + e.message, 'error'); } finally { if (window.state.isProcessing) window.ui.setLoading(false); }
             },
@@ -520,7 +680,14 @@
                     let base64Img = "";
                     if (file.type === 'application/pdf') base64Img = await window.helpers.pdfToImageBase64(file);
                     else base64Img = await window.helpers.fileToBase64(file);
-                    const analysis = await window.helpers.callGeminiVisionJSON(`Analiza esta imagen. Extrae: {"documentDate": "YYYY-MM-DD", "documentType": "Tipo", "keyFindings": "Resumen 2 lineas"}`, base64Img);
+                    const analysis = await window.helpers.callGeminiVisionJSON(`
+                        Analiza esta imagen de documento legal. 
+                        Extrae JSON exacto: {
+                            "documentDate": "YYYY-MM-DD", 
+                            "documentType": "Tipo", 
+                            "keyFindings": "Resumen detallado (aprox 80-100 palabras) describiendo el contenido visual, sellos, firmas y la resolución o contenido sustancial del escrito."
+                        }
+                    `, base64Img);
                     await window.logic.saveDocumentToProfile(file, analysis);
                 } catch (e) { window.ui.showToast("Error en análisis visual: " + e.message, 'error'); } finally { window.ui.setLoading(false); }
             },
@@ -539,7 +706,6 @@
                 window.ui.showToast("Documento agregado con éxito", 'success');
             },
             deleteDocument: (docUrl) => {
-                // RBAC: Solo Juez puede borrar
                 if (window.state.role !== 'juez') return window.ui.showToast("Permiso denegado: Solo Juez puede eliminar.", "error");
 
                 window.ui.showConfirm("Eliminar Evidencia", "¿Está absolutamente seguro?", async () => {
@@ -568,8 +734,47 @@
                     } catch (e) { window.ui.showToast("Error: " + e.message, 'error'); } finally { window.ui.setLoading(false); }
                 });
             },
+            // NUEVA FUNCIÓN: Eliminar Perfil Completo
+            deleteProfile: (id) => {
+                if (window.state.role !== 'juez') return window.ui.showToast("Permiso denegado: Solo Juez puede eliminar perfiles.", "error");
+                
+                const inmate = window.state.inmates.find(i => i.id === id);
+                if (!inmate) return;
+
+                window.ui.showConfirm("⚠️ ELIMINAR PERFIL COMPLETO", `¿Está seguro de eliminar a ${inmate.fullName}? Se borrarán permanentemente el perfil y sus ${inmate.documents?.length || 0} documentos asociados.`, async () => {
+                    window.ui.setLoading(true, "Eliminando perfil y archivos...");
+                    try {
+                        // 1. Borrar archivos de Storage asociados
+                        const docs = inmate.documents || [];
+                        const deletePromises = docs.map(doc => {
+                            try {
+                                return firebase.storage().refFromURL(doc.url).delete().catch(e => console.warn("Archivo ya no existía en storage", e));
+                            } catch (e) { return Promise.resolve(); }
+                        });
+                        await Promise.all(deletePromises);
+
+                        // 2. Borrar documento de Firestore
+                        await firebase.firestore().collection('inmate_profiles').doc(id).delete();
+
+                        // 3. Log Auditoria (Queda el registro aunque se borre el perfil)
+                        window.logic.logAudit(id, "PERFIL ELIMINADO", `Nombre: ${inmate.fullName}. Documentos borrados: ${docs.length}`);
+
+                        window.state.lastLocalUpdate = Date.now();
+                        window.state.selectedInmate = null;
+                        
+                        // 4. Limpiar vista
+                        window.app.renderDashboard(); 
+                        window.ui.showToast("Perfil eliminado correctamente", "success");
+
+                    } catch (e) {
+                        console.error(e);
+                        window.ui.showToast("Error al eliminar perfil: " + e.message, 'error');
+                    } finally {
+                        window.ui.setLoading(false);
+                    }
+                });
+            },
             toggleStatus: (id, currentStatusRaw) => {
-                // RBAC: Consulta no puede cambiar estado
                 if (window.state.role === 'consulta') return window.ui.showToast("Solo lectura", "error");
 
                 const currentStatus = (currentStatusRaw && currentStatusRaw !== 'undefined') ? currentStatusRaw : 'Activo';
@@ -589,7 +794,6 @@
         window.app = {
             login: async (e) => {
                 e.preventDefault();
-                // GUARDAR PREFERENCIA DE ROL SELECCIONADO
                 const role = document.getElementById('role-select').value;
                 localStorage.setItem('user_role_pref', role);
 
@@ -707,8 +911,10 @@
                 const filtered = window.state.inmates.filter(i => i.fullName.toLowerCase().includes(window.state.searchQuery.toLowerCase()) || (i.inmateId && i.inmateId.includes(window.state.searchQuery)));
                 document.getElementById('inmate-list').innerHTML = filtered.map(i => {
                     const isFree = i.status === 'Libertad Definitiva';
+                    // Safe check for selectedInmate
+                    const isSelected = window.state.selectedInmate && window.state.selectedInmate.id === i.id;
                     return `
-                    <div onclick="window.app.selectInmate('${i.id}')" class="p-3 rounded border ${window.state.selectedInmate?.id === i.id ? 'bg-blue-900/20 border-blue-500/50' : 'border-transparent'} cursor-pointer hover:bg-slate-800 transition">
+                    <div onclick="window.app.selectInmate('${i.id}')" class="p-3 rounded border ${isSelected ? 'bg-blue-900/20 border-blue-500/50' : 'border-transparent'} cursor-pointer hover:bg-slate-800 transition">
                         <h3 class="text-sm font-bold ${isFree ? 'text-green-400' : 'text-slate-200'} truncate flex items-center gap-2"><span>${isFree ? '🕊️' : '🙋'}</span> ${i.fullName}</h3>
                         <div class="flex justify-between items-center mt-1 pl-6"><span class="text-[10px] text-slate-500 font-mono">${i.inmateId || 'N/A'}</span><span class="text-[9px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">${i.documents?.length || 0} Docs</span></div>
                     </div>`;
@@ -730,11 +936,19 @@
                                 <h2 class="text-xl md:text-2xl font-bold text-white">${i.fullName}</h2>
                                 <button ${canEdit ? '' : 'disabled'} onclick="window.logic.toggleStatus('${i.id}', '${i.status || 'Activo'}')" class="text-xs ${isFree ? 'bg-green-900/50 text-green-400 border-green-900' : 'bg-blue-900/50 text-blue-400 border-blue-900'} px-2 py-1 rounded border hover:opacity-80 transition cursor-pointer font-mono select-none ${canEdit ? '' : 'opacity-50 cursor-not-allowed'}" title="Clic para cambiar estado">${i.status || 'Activo'}</button>
                             </div>
-                            <div class="flex gap-2">
+                            <div class="flex gap-2 items-center">
                                 <button onclick="window.ui.openChat()" class="text-xs flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded shadow transition">
                                     🤖 <span class="hidden md:inline">Interrogar IA</span>
                                 </button>
-                                ${canAudit ? `<button onclick="window.ui.openAudit('${i.id}')" class="text-xs flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-600 transition">📜 <span class="hidden md:inline">Historial</span></button>` : ''}
+                                ${canAudit ? `
+                                    <button onclick="window.ui.openAudit('${i.id}')" class="text-xs flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-600 transition">
+                                        📜 <span class="hidden md:inline">Historial</span>
+                                    </button>
+                                    <!-- BOTON ELIMINAR PERFIL -->
+                                    <button onclick="window.logic.deleteProfile('${i.id}')" class="text-xs flex items-center gap-1 bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-1.5 rounded border border-red-900/50 transition ml-1" title="Eliminar Perfil Completo">
+                                        🗑️
+                                    </button>
+                                ` : ''}
                             </div>
                         </div>
                         <p class="text-slate-400 text-sm line-clamp-2">${i.crimeSummary || 'Sin resumen.'}</p>
