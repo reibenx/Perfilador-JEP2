@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfilador AI JEP2 | Poder Judicial</title>
+    
+    <!-- TAILWIND CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- FIREBASE V8.10.1 (COMPAT) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+
+    <!-- PDF.JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
+    <!-- TESSERACT.JS v5 -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+
+    <style>
+        /* Estilos base */
+        body { font-family: 'Inter', sans-serif; background-color: #020617; color: #e2e8f0; }
+        
+        /* Scrollbar personalizada oscura */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Loader */
+        .loader {
+            border: 4px solid #1e293b;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Drag & Drop */
+        .drop-zone { border: 2px dashed #334155; transition: all 0.2s; }
+        .drop-zone.dragover { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.1); }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-slate-950">
+
+    <!-- HEADER -->
+    <header class="flex-none bg-slate-900 border-b border-slate-800 h-16 flex items-center justify-between px-6 shadow-lg z-50">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-900 rounded-full flex items-center justify-center border border-blue-500">
+                <span class="text-xs font-bold text-white">PJ</span>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold text-slate-100 tracking-tight">PERFILADOR AI JEP2</h1>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest">Poder Judicial de Catamarca</p>
+            </div>
+        </div>
+        <div id="user-info" class="hidden flex items-center gap-4">
+            <span id="user-email" class="text-sm text-slate-300 hidden md:inline"></span>
+            <button onclick="window.app.logout()" class="text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 px-3 py-1.5 rounded border border-red-900 transition">
+                Salir
+            </button>
+        </div>
+    </header>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main id="app-container" class="flex-1 flex flex-col md:flex-row relative min-h-0 overflow-hidden">
+        <!-- Vistas inyectadas aquí -->
+    </main>
+
+    <!-- LOADING OVERLAY -->
+    <div id="loading-overlay" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center z-[100]">
+        <div class="loader mb-4"></div>
+        <p class="text-slate-400 text-sm animate-pulse font-mono tracking-wide" id="loading-text">Inicializando sistemas judiciales...</p>
+    </div>
+
+    <!-- MODAL DE CONFIRMACIÓN -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-sm w-full p-6 transform scale-100 transition-all">
+            <h3 id="confirm-title" class="text-lg font-bold text-white mb-2">Confirmar Acción</h3>
+            <p id="confirm-message" class="text-slate-300 text-sm mb-6 leading-relaxed">¿Está seguro de continuar?</p>
+            <div class="flex justify-end gap-3">
+                <button id="confirm-cancel" class="px-4 py-2 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition text-sm">Cancelar</button>
+                <button id="confirm-ok" class="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-lg shadow-red-900/20">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOASTS -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-[100] flex flex-col gap-2"></div>
+
+    <script>
+        // CONFIG
+        const firebaseConfig = {
+            apiKey: "AIzaSyCP0FlSV9PECEVq6iWJ6ajT7b0yzRcVggw",
+            authDomain: "perfilador-penitenciario.firebaseapp.com",
+            projectId: "perfilador-penitenciario",
+            storageBucket: "perfilador-penitenciario.firebasestorage.app",
+            messagingSenderId: "449122558886",
+            appId: "1:449122558886:web:b440366cb44f8ec2252567"
+        };
+
+        const GEMINI_API_KEY = "AIzaSyD75ul9bSgckdpm35z2WjRUPtS_z4RWAfY";
+        const GEMINI_MODEL = "gemini-2.5-flash";
+
+        // ESTADO GLOBAL
+        window.state = {
+            user: null,
+            inmates: [],
+            selectedInmate: null,
+            isProcessing: false,
+            searchQuery: ""
+        };
+
+        // INICIALIZACIÓN
+        window.onload = function() {
+            try {
+                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                
+                firebase.auth().onAuthStateChanged((user) => {
+                    window.state.user = user;
+                    window.ui.setLoading(false);
+
+                    if (user) {
+                        document.getElementById('user-info').classList.remove('hidden');
+                        document.getElementById('user-email').textContent = user.email;
+                        window.app.renderDashboard();
+                        window.app.subscribeToInmates();
+                    } else {
+                        document.getElementById('user-info').classList.add('hidden');
+                        window.app.renderLogin();
+                    }
+                });
+
+                document.getElementById('confirm-cancel').onclick = window.ui.hideConfirm;
+
+            } catch (error) {
+                console.error("Init Error:", error);
+                alert("Error inicializando. Revise consola.");
+            }
+        };
+
+        // UI HELPERS (Global)
+        window.ui = {
+            confirmCallback: null,
+
+            setLoading: (show, msg) => {
+                const el = document.getElementById('loading-overlay');
+                if(!el) return;
+                el.classList.toggle('hidden', !show);
+                if(show && msg) el.querySelector('p').textContent = msg;
+            },
+
+            showToast: (msg, type) => {
+                const c = document.getElementById('toast-container');
+                if(!c) return;
+                const d = document.createElement('div');
+                d.className = `px-4 py-3 rounded shadow-lg border text-sm text-white ${type === 'error' ? 'bg-red-900 border-red-700' : 'bg-green-900 border-green-700'}`;
+                d.textContent = msg;
+                c.appendChild(d);
+                setTimeout(() => d.remove(), 3000);
+            },
+
+            showConfirm: (title, msg, callback) => {
+                const modal = document.getElementById('confirm-modal');
+                document.getElementById('confirm-title').textContent = title;
+                document.getElementById('confirm-message').textContent = msg;
+                window.ui.confirmCallback = callback;
+                
+                const okBtn = document.getElementById('confirm-ok');
+                okBtn.onclick = () => {
+                    if (window.ui.confirmCallback) window.ui.confirmCallback();
+                    window.ui.hideConfirm();
+                };
+                
+                modal.classList.remove('hidden');
+            },
+
+            hideConfirm: () => {
+                const modal = document.getElementById('confirm-modal');
+                modal.classList.add('hidden');
+                window.ui.confirmCallback = null;
+            },
+
+            setupDragAndDrop: (id, cb) => {
+                const el = document.getElementById(id);
+                if(!el) return;
+                const inp = el.querySelector('input');
+                el.onclick = () => inp.click();
+                el.ondragover = e => { e.preventDefault(); el.classList.add('bg-slate-800'); };
+                el.ondragleave = () => el.classList.remove('bg-slate-800');
+                el.ondrop = e => { e.preventDefault(); el.classList.remove('bg-slate-800'); if(e.dataTransfer.files[0]) cb(e.dataTransfer.files); };
+            }
+        };
+
+        // LOGIC & HELPERS (Global)
+        window.helpers = {
+            extractNativeTextPDF: async (file) => {
+                const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                let fullText = "";
+                for (let i = 1; i <= Math.min(pdf.numPages, 5); i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    fullText += content.items.map(item => item.str).join(' ') + "\n";
+                }
+                return fullText;
+            },
+
+            performOCR: async (file) => {
+                let img = file;
+                if (file.type === 'application/pdf') {
+                    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                    const page = await pdf.getPage(1);
+                    const viewport = page.getViewport({ scale: 2.0 });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width; canvas.height = viewport.height;
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                    img = canvas.toDataURL('image/png');
+                }
+                const worker = await Tesseract.createWorker('spa');
+                const ret = await worker.recognize(img);
+                await worker.terminate();
+                return ret.data.text;
+            },
+
+            callGeminiJSON: async (prompt) => {
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+                if (!resp.ok) throw new Error("API IA Error");
+                const txt = (await resp.json()).candidates?.[0]?.content?.parts?.[0]?.text;
+                return JSON.parse(txt.replace(/```json|```/g, ''));
+            }
+        };
+
+        // APP LOGIC (Global)
+        window.logic = {
+            processMassList: async (file) => {
+                if (!file || file.type !== 'application/pdf') return window.ui.showToast('Use PDF para carga masiva', 'error');
+                window.ui.setLoading(true, "Procesando lista...");
+                try {
+                    const text = await window.helpers.extractNativeTextPDF(file);
+                    if (text.length < 50) throw new Error("PDF escaneado/imagen no soportado para listas masivas.");
+
+                    const result = await window.helpers.callGeminiJSON(`
+                        Extrae lista de internos de este texto penitenciario.
+                        Salida JSON Array: [{"inmateId": "string", "fullName": "string", "crimeSummary": "corto"}].
+                        Texto: ${text.substring(0, 30000)}
+                    `);
+                    
+                    if (!Array.isArray(result)) throw new Error("Formato inválido de IA");
+
+                    const db = firebase.firestore();
+                    const batch = db.batch();
+                    result.forEach(item => {
+                        const ref = db.collection('inmate_profiles').doc();
+                        batch.set(ref, { ...item, status: 'Activo', documents: [], createdAt: new Date() });
+                    });
+                    await batch.commit();
+                    window.ui.showToast(`${result.length} perfiles importados`, 'success');
+                } catch (e) {
+                    window.ui.showToast(e.message, 'error');
+                } finally {
+                    window.ui.setLoading(false);
+                }
+            },
+
+            processDocument: async (file) => {
+                if (!window.state.selectedInmate) return window.ui.showToast("Seleccione interno", 'error');
+                if (!file) return;
+
+                window.ui.setLoading(true, "Analizando documento...");
+                try {
+                    let text = "";
+                    if (file.type === 'application/pdf') {
+                        text = await window.helpers.extractNativeTextPDF(file);
+                        if (text.trim().length < 50) {
+                            window.ui.setLoading(true, "Aplicando OCR (Lento)...");
+                            text = await window.helpers.performOCR(file);
+                        }
+                    } else {
+                        text = await window.helpers.performOCR(file);
+                    }
+
+                    if (text.length < 10) throw new Error("Texto ilegible");
+
+                    window.ui.setLoading(true, "Interpretando con IA...");
+                    const analysis = await window.helpers.callGeminiJSON(`
+                        Analiza texto judicial. JSON exacto:
+                        {"documentDate": "YYYY-MM-DD", "documentType": "Tipo", "keyFindings": "Resumen 2 lineas"}
+                        Texto: ${text.substring(0, 15000)}
+                    `);
+
+                    window.ui.setLoading(true, "Subiendo archivo...");
+                    const ref = firebase.storage().ref().child(`docs/${window.state.selectedInmate.id}/${Date.now()}_${file.name}`);
+                    await ref.put(file);
+                    const url = await ref.getDownloadURL();
+
+                    await firebase.firestore().collection('inmate_profiles').doc(window.state.selectedInmate.id).update({
+                        documents: firebase.firestore.FieldValue.arrayUnion({ ...analysis, url, uploadedAt: new Date().toISOString() })
+                    });
+                    
+                    window.app.selectInmate(window.state.selectedInmate.id);
+                    window.ui.showToast("Documento agregado", 'success');
+                } catch (e) {
+                    console.error(e);
+                    window.ui.showToast("Error: " + e.message, 'error');
+                } finally {
+                    window.ui.setLoading(false);
+                }
+            },
+
+            deleteDocument: (docUrl) => {
+                window.ui.showConfirm(
+                    "Eliminar Evidencia", 
+                    "¿Está absolutamente seguro de eliminar este documento? Esta acción eliminará el registro y el archivo de forma permanente.", 
+                    async () => {
+                        window.ui.setLoading(true, "Eliminando evidencia...");
+                        try {
+                            const inmateId = window.state.selectedInmate.id;
+                            const docRef = firebase.firestore().collection('inmate_profiles').doc(inmateId);
+
+                            const snapshot = await docRef.get();
+                            const currentDocs = snapshot.data().documents || [];
+                            const updatedDocs = currentDocs.filter(d => d.url !== docUrl);
+
+                            await docRef.update({ documents: updatedDocs });
+
+                            try {
+                                await firebase.storage().refFromURL(docUrl).delete();
+                            } catch (storageErr) {
+                                console.warn("Archivo ya no existía en storage o error de permisos", storageErr);
+                            }
+
+                            window.ui.showToast("Documento eliminado correctamente", "success");
+                            window.state.selectedInmate.documents = updatedDocs;
+                            window.app.renderInmateDetail();
+
+                        } catch (e) {
+                            console.error(e);
+                            window.ui.showToast("Error al eliminar: " + e.message, 'error');
+                        } finally {
+                            window.ui.setLoading(false);
+                        }
+                    }
+                );
+            },
+
+            toggleStatus: (id, currentStatusRaw) => {
+                // FIX: Sanitizar entrada. Si es "undefined" (string) o falsy, usar 'Activo'
+                const currentStatus = (currentStatusRaw && currentStatusRaw !== 'undefined') ? currentStatusRaw : 'Activo';
+                const newStatus = currentStatus === 'Activo' ? 'Libertad Definitiva' : 'Activo';
+                const message = `¿Desea cambiar el estado del interno de "${currentStatus}" a "${newStatus}"?`;
+                
+                window.ui.showConfirm(
+                    "Cambio de Estado", 
+                    message,
+                    async () => {
+                        try {
+                            await firebase.firestore().collection('inmate_profiles').doc(id).update({
+                                status: newStatus
+                            });
+                            window.ui.showToast(`Estado actualizado a: ${newStatus}`, 'success');
+                            if (window.state.selectedInmate && window.state.selectedInmate.id === id) {
+                                window.state.selectedInmate.status = newStatus;
+                                window.app.renderInmateDetail();
+                            }
+                        } catch (e) {
+                            window.ui.showToast("Error actualizando estado", 'error');
+                        }
+                    }
+                );
+            }
+        };
+
+        // APP UI CONTROLLER (Global)
+        window.app = {
+            login: async (e) => {
+                e.preventDefault();
+                try {
+                    await firebase.auth().signInWithEmailAndPassword(e.target.email.value, e.target.password.value);
+                } catch (error) {
+                    window.ui.showToast(error.message, 'error');
+                }
+            },
+
+            logout: () => firebase.auth().signOut(),
+
+            subscribeToInmates: () => {
+                const db = firebase.firestore();
+                db.collection('inmate_profiles').orderBy('fullName')
+                    .onSnapshot((snapshot) => {
+                        window.state.inmates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        window.app.refreshInmateList();
+                        if(window.state.selectedInmate) {
+                            const updated = window.state.inmates.find(i => i.id === window.state.selectedInmate.id);
+                            if(updated) {
+                                window.state.selectedInmate = updated;
+                                window.app.renderInmateDetail();
+                            }
+                        }
+                    }, (error) => {
+                        console.error(error);
+                    });
+            },
+
+            selectInmate: (id) => {
+                window.state.selectedInmate = window.state.inmates.find(i => i.id === id);
+                window.app.renderInmateDetail();
+            },
+
+            createManualInmate: async () => {
+                const name = prompt("Nombre del interno:");
+                if (!name) return;
+                try {
+                    const db = firebase.firestore();
+                    const docRef = await db.collection('inmate_profiles').add({
+                        fullName: name,
+                        inmateId: 'MAN-' + Date.now().toString().slice(-6),
+                        crimeSummary: 'Perfil manual',
+                        status: 'Activo',
+                        documents: [],
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    window.ui.showToast("Perfil creado", 'success');
+                    window.app.selectInmate(docRef.id);
+                } catch (err) {
+                    window.ui.showToast("Error creando perfil", 'error');
+                }
+            },
+
+            renderLogin: () => {
+                document.getElementById('app-container').innerHTML = `
+                    <div class="w-full h-full flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] overflow-y-auto">
+                        <div class="bg-slate-900 p-8 rounded-xl border border-slate-700 shadow-2xl w-96 m-4">
+                            <h2 class="text-2xl font-bold text-white mb-2">Acceso Seguro</h2>
+                            <form onsubmit="window.app.login(event)" class="space-y-4 mt-6">
+                                <input type="email" name="email" placeholder="Email" required class="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none">
+                                <input type="password" name="password" placeholder="Contraseña" required class="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none">
+                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition">Ingresar</button>
+                            </form>
+                        </div>
+                    </div>
+                `;
+            },
+
+            renderDashboard: () => {
+                const container = document.getElementById('app-container');
+                container.innerHTML = `
+                    <aside class="w-full md:w-80 bg-slate-900 border-r border-slate-800 flex flex-col h-1/3 md:h-full flex-none overflow-hidden z-10">
+                        <div class="p-4 border-b border-slate-800 space-y-3 bg-slate-900">
+                            <input type="text" placeholder="Buscar..." 
+                                oninput="window.app.handleSearch(this.value)"
+                                class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none">
+                            
+                            <div class="flex gap-2">
+                                <button onclick="window.app.createManualInmate()" class="flex-1 bg-slate-800 text-xs text-white py-2 rounded border border-slate-600 hover:bg-slate-700">+ Nuevo</button>
+                            </div>
+
+                            <div id="mass-upload-zone" class="drop-zone p-3 rounded bg-slate-950/50 border-dashed border-slate-600 text-center cursor-pointer">
+                                <p class="text-[10px] text-slate-400">📂 Carga Masiva (PDF)</p>
+                                <input type="file" id="mass-input" accept=".pdf" class="hidden" onchange="window.logic.processMassList(this.files[0])">
+                            </div>
+                        </div>
+                        <div id="inmate-list" class="flex-1 overflow-y-auto p-2 space-y-1 scroll-smooth"></div>
+                    </aside>
+
+                    <section id="main-content" class="flex-1 bg-slate-950 relative flex flex-col h-2/3 md:h-full overflow-hidden min-w-0">
+                        <div class="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 text-center">
+                            <p>Seleccione un interno del listado.</p>
+                        </div>
+                    </section>
+                `;
+                window.ui.setupDragAndDrop('mass-upload-zone', (files) => window.logic.processMassList(files[0]));
+            },
+
+            refreshInmateList: () => {
+                const listEl = document.getElementById('inmate-list');
+                if (!listEl) return;
+                
+                const filtered = window.state.inmates.filter(i => 
+                    i.fullName.toLowerCase().includes(window.state.searchQuery.toLowerCase()) || 
+                    (i.inmateId && i.inmateId.includes(window.state.searchQuery))
+                );
+
+                listEl.innerHTML = filtered.map(i => {
+                    const isFree = i.status === 'Libertad Definitiva';
+                    const icon = isFree ? '🕊️' : '🙋';
+                    const nameColor = isFree ? 'text-green-400' : 'text-slate-200';
+                    const borderColor = window.state.selectedInmate?.id === i.id ? 'border-blue-500/50' : 'border-transparent';
+                    
+                    return `
+                    <div onclick="window.app.selectInmate('${i.id}')" 
+                        class="p-3 rounded border ${borderColor} cursor-pointer hover:bg-slate-800 transition ${window.state.selectedInmate?.id === i.id ? 'bg-blue-900/20' : ''}">
+                        <h3 class="text-sm font-bold ${nameColor} truncate flex items-center gap-2">
+                            <span>${icon}</span> 
+                            ${i.fullName}
+                        </h3>
+                        <div class="flex justify-between items-center mt-1 pl-6">
+                            <span class="text-[10px] text-slate-500 font-mono">${i.inmateId || 'N/A'}</span>
+                            <span class="text-[9px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">${i.documents?.length || 0} Docs</span>
+                        </div>
+                    </div>
+                `}).join('');
+            },
+
+            renderInmateDetail: () => {
+                const i = window.state.selectedInmate;
+                const container = document.getElementById('main-content');
+                if (!i) return;
+
+                const isFree = i.status === 'Libertad Definitiva';
+                const statusColor = isFree ? 'bg-green-900/50 text-green-400 border-green-900' : 'bg-blue-900/50 text-blue-400 border-blue-900';
+
+                // FIX: Pasar explicitamente 'Activo' si el status es undefined para evitar el string "undefined" en JS
+                container.innerHTML = `
+                    <div class="flex-none p-6 border-b border-slate-800 bg-slate-900/50">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center gap-2">
+                                <h2 class="text-xl md:text-2xl font-bold text-white">${i.fullName}</h2>
+                                <button onclick="window.logic.toggleStatus('${i.id}', '${i.status || 'Activo'}')" 
+                                    class="text-xs ${statusColor} px-2 py-1 rounded border hover:opacity-80 transition cursor-pointer font-mono select-none" title="Clic para cambiar estado">
+                                    ${i.status || 'Activo'}
+                                </button>
+                            </div>
+                        </div>
+                        <p class="text-slate-400 text-sm line-clamp-2">${i.crimeSummary || 'Sin resumen.'}</p>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto p-6 bg-slate-950 scroll-smooth">
+                        <div id="doc-upload-zone" class="drop-zone border-2 border-dashed border-slate-700 rounded-lg p-6 mb-6 flex flex-col items-center justify-center text-slate-500 hover:text-slate-300 hover:border-slate-500 cursor-pointer transition">
+                            <p class="text-sm font-medium">Arrastre Documento (PDF/IMG)</p>
+                            <input type="file" id="doc-input" class="hidden" accept=".pdf,.jpg,.png,.jpeg" onchange="window.logic.processDocument(this.files[0])">
+                        </div>
+
+                        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 pb-10">
+                            ${(i.documents || []).map(doc => `
+                                <div class="bg-slate-900 border border-slate-800 rounded p-4 hover:border-blue-500/50 transition relative group">
+                                    <div class="flex justify-between mb-2 pr-6">
+                                        <span class="text-[10px] font-bold text-blue-400 bg-blue-900/20 px-2 py-0.5 rounded">${doc.documentType || 'DOC'}</span>
+                                        <span class="text-[10px] text-slate-500">${doc.documentDate || ''}</span>
+                                    </div>
+                                    <p class="text-xs text-slate-300 mb-3 leading-relaxed">${doc.keyFindings || '...'}</p>
+                                    
+                                    <div class="flex justify-between items-center mt-2 pt-2 border-t border-slate-800">
+                                        <a href="${doc.url}" target="_blank" class="text-[11px] text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1">
+                                            Ver Archivo <span class="text-lg">↗</span>
+                                        </a>
+                                        <button onclick="window.logic.deleteDocument('${doc.url}')" 
+                                            class="text-slate-600 hover:text-red-500 transition p-1 hover:bg-slate-800 rounded flex items-center gap-1" title="Eliminar documento">
+                                            <span class="text-[10px] uppercase font-bold">Eliminar</span>
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                window.ui.setupDragAndDrop('doc-upload-zone', (files) => window.logic.processDocument(files[0]));
+            },
+
+            handleSearch: (val) => {
+                window.state.searchQuery = val;
+                window.app.refreshInmateList();
+            }
+        };
+    </script>
+</body>
+</html>
