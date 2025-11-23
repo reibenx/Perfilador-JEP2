@@ -2,144 +2,187 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Perfilador AI JEP2 | Poder Judicial</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-
+    
     <!-- FIREBASE V8.10.1 (COMPAT) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
-
+    
     <!-- PDF.JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
-
+    
     <!-- TESSERACT.JS v5 -->
     <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
-
+    
     <!-- MARKDOWN PARSER -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <style>
-        /* Estilos base */
-        body { font-family: 'Inter', sans-serif; background-color: #020617; color: #e2e8f0; }
+        /* --- ESTILOS MODERNOS & INSTITUCIONALES --- */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         
-        /* Scrollbar personalizada oscura */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #0f172a; /* Slate 950 */
+            color: #e2e8f0; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Scrollbar Sofisticada */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-        /* Loader */
+        /* Loader Judicial */
         .loader {
-            border: 4px solid #1e293b;
-            border-top: 4px solid #3b82f6;
+            width: 48px; height: 48px;
+            border: 3px solid #1e293b;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
+            display: inline-block;
+            position: relative;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loader::after {
+            content: '';  
+            box-sizing: border-box;
+            position: absolute;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            border-bottom-color: #fbbf24; /* Amber dorado institucional */
+        }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Drag & Drop */
-        .drop-zone { border: 2px dashed #334155; transition: all 0.2s; }
-        .drop-zone.dragover { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.1); }
-
-        /* Drawer de Auditoría */
-        .audit-drawer { transition: transform 0.3s ease-in-out; }
-        .audit-drawer.open { transform: translateX(0); }
-        .audit-drawer.closed { transform: translateX(100%); }
+        /* Utilidades UI */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .drop-zone { 
+            background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='12' ry='12' stroke='%23475569FF' stroke-width='2' stroke-dasharray='12%2c 12' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+            transition: all 0.2s ease;
+        }
+        .drop-zone.dragover { background-color: rgba(99, 102, 241, 0.1); border-color: #818cf8; }
 
         /* Chat IA */
-        .chat-bubble { max-width: 80%; border-radius: 12px; padding: 10px; font-size: 0.9rem; }
-        .chat-user { background-color: #1e293b; align-self: flex-end; color: white; }
-        .chat-ai { background-color: #172554; align-self: flex-start; color: #bfdbfe; border: 1px solid #1e3a8a; }
-        .chat-system { background-color: #064e3b; align-self: center; color: #6ee7b7; border: 1px dashed #059669; font-size: 0.75rem; }
+        .chat-bubble { max-width: 85%; border-radius: 16px; padding: 12px 16px; font-size: 0.95rem; line-height: 1.5; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .chat-user { background: linear-gradient(135deg, #4f46e5, #4338ca); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .chat-ai { background-color: #1e293b; align-self: flex-start; color: #e2e8f0; border: 1px solid #334155; border-bottom-left-radius: 4px; }
+        .chat-system { background-color: #064e3b; color: #6ee7b7; font-size: 0.75rem; border: 1px solid #059669; align-self: center; padding: 4px 10px; border-radius: 20px; margin: 4px 0; }
+
+        /* Drawer */
+        .audit-drawer { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .audit-drawer.open { transform: translateX(0); }
+        .audit-drawer.closed { transform: translateX(100%); }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden bg-slate-950">
 
-    <!-- HEADER -->
-    <header class="flex-none bg-slate-900 border-b border-slate-800 h-16 flex items-center justify-between px-6 shadow-lg z-50">
+    <!-- HEADER INSTITUCIONAL -->
+    <header class="flex-none h-16 bg-slate-900/90 backdrop-blur-md border-b border-slate-700/60 flex items-center justify-between px-4 md:px-6 z-50 sticky top-0 shadow-sm">
         <div class="flex items-center gap-3">
-            <div class="w-8 h-8 bg-blue-900 rounded-full flex items-center justify-center border border-blue-500">
-                <span class="text-xs font-bold text-white">PJ</span>
+            <!-- Logo Institucional -->
+            <div class="w-10 h-10 bg-gradient-to-br from-indigo-900 to-slate-900 rounded-lg flex items-center justify-center border border-indigo-500/30 shadow-lg shadow-indigo-900/20">
+                <span class="text-xl">⚖️</span>
             </div>
             <div>
-                <h1 class="text-lg font-bold text-slate-100 tracking-tight">PERFILADOR AI JEP2</h1>
-                <p class="text-[10px] text-slate-400 uppercase tracking-widest">Poder Judicial de Catamarca</p>
+                <h1 class="text-lg font-bold text-white tracking-tight leading-none">PERFILADOR JEP2</h1>
+                <p class="text-[10px] text-indigo-300 font-medium uppercase tracking-widest mt-0.5">Poder Judicial</p>
             </div>
         </div>
-        <div id="user-info" class="hidden flex items-center gap-4">
-            <div class="text-right">
-                <span id="user-email" class="block text-sm text-slate-300"></span>
-                <span id="user-role-badge" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400 uppercase font-bold tracking-wider"></span>
+        
+        <div id="user-info" class="hidden flex items-center gap-3 md:gap-5">
+            <div class="text-right hidden md:block">
+                <span id="user-email" class="block text-xs font-medium text-slate-300"></span>
+                <span id="user-role-badge" class="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"></span>
             </div>
-            <button onclick="window.app.logout()" class="text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 px-3 py-1.5 rounded border border-red-900 transition">
-                Salir
+            <button onclick="window.app.logout()" class="group relative p-2 text-slate-400 hover:text-red-400 transition-colors bg-slate-800/50 rounded-lg hover:bg-red-900/20">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 01-3-3V7a3 3 0 01-3 3v1"></path></svg>
             </button>
         </div>
     </header>
 
     <!-- CONTENEDOR PRINCIPAL -->
     <main id="app-container" class="flex-1 flex flex-col md:flex-row relative min-h-0 overflow-hidden">
-        <!-- Vistas inyectadas aquí -->
+        <!-- Vistas inyectadas aquí por JS -->
     </main>
 
     <!-- DRAWER DE AUDITORÍA -->
     <div id="audit-overlay" class="hidden fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[150]" onclick="window.ui.closeAudit()"></div>
-    <div id="audit-drawer" class="audit-drawer closed fixed top-0 right-0 h-full w-96 bg-slate-900 border-l border-slate-700 shadow-2xl z-[160] flex flex-col">
+    <div id="audit-drawer" class="audit-drawer closed fixed top-0 right-0 h-full w-full md:w-96 bg-slate-900 border-l border-slate-700 shadow-2xl z-[160] flex flex-col">
         <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
             <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                📜 Historial de Auditoría
+                 📜  Historial de Auditoría
             </h3>
-            <button onclick="window.ui.closeAudit()" class="text-slate-400 hover:text-white">✕</button>
+            <button onclick="window.ui.closeAudit()" class="text-slate-400 hover:text-white p-2"> ✕ </button>
         </div>
         <div id="audit-list" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
     </div>
 
-    <!-- MODAL CHAT IA (RAG MEJORADO) -->
-    <div id="chat-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-5xl h-[80vh] flex overflow-hidden">
+    <!-- NUEVO: MODAL PARA LEER NOTAS COMPLETAS -->
+    <div id="note-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[80vh]">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 rounded-t-xl">
+                <h3 class="text-lg font-bold text-emerald-400 flex items-center gap-2">📝 Nota del Asistente Jurídico</h3>
+                <button onclick="window.ui.closeNote()" class="text-slate-400 hover:text-white transition p-2">✕</button>
+            </div>
+            <div class="p-6 overflow-y-auto text-slate-200 text-sm leading-relaxed space-y-2 chat-ai rounded-b-xl" id="note-content">
+                <!-- Contenido inyectado aquí -->
+            </div>
+            <div class="p-4 border-t border-slate-800 flex justify-end bg-slate-900 rounded-b-xl">
+                <button onclick="window.ui.closeNote()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition text-sm font-medium">Cerrar Nota</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CHAT IA -->
+    <div id="chat-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-2 md:p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex overflow-hidden flex-col md:flex-row">
             
-            <!-- SIDEBAR DOCUMENTOS CHAT -->
-            <div class="w-1/3 bg-slate-950 border-r border-slate-800 flex flex-col hidden md:flex">
+            <!-- SIDEBAR DOCUMENTOS CHAT (Oculto en móvil) -->
+            <div class="w-full md:w-1/3 bg-slate-950 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col hidden md:flex">
                 <div class="p-4 border-b border-slate-800 bg-slate-900">
-                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">Documentos del Legajo</h3>
-                    <p class="text-[10px] text-slate-500 mt-1">Haga clic en "👁️" para lectura profunda.</p>
+                    <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Documentos del Legajo</h3>
+                    <p class="text-[10px] text-slate-500 mt-1">Clic en "👁️" para lectura profunda.</p>
                 </div>
-                <div id="chat-docs-list" class="flex-1 overflow-y-auto p-2 space-y-2">
-                    <!-- Lista inyectada por JS -->
-                </div>
+                <div id="chat-docs-list" class="flex-1 overflow-y-auto p-2 space-y-2"></div>
             </div>
 
             <!-- AREA DE CHAT -->
             <div class="flex-1 flex flex-col bg-slate-900 relative">
                 <div class="p-4 border-b border-slate-800 bg-slate-900 flex justify-between items-center shadow-md z-10">
                     <div>
-                        <h3 class="text-lg font-bold text-blue-400 flex items-center gap-2">
-                            🤖 Asistente Jurídico
+                        <h3 class="text-base font-bold text-indigo-400 flex items-center gap-2">
+                             🤖  Asistente Jurídico
                         </h3>
                         <p class="text-[10px] text-slate-500" id="chat-context-status">Contexto: Resúmenes básicos</p>
                     </div>
-                    <button onclick="window.ui.closeChat()" class="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 p-1.5 rounded transition">✕</button>
+                    <button onclick="window.ui.closeChat()" class="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 p-2 rounded transition"> ✕ </button>
                 </div>
                 
-                <div id="chat-history" class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-slate-900/50">
-                    <div class="chat-ai chat-bubble">
-                        Hola. Tengo acceso a los resúmenes de este legajo. Si necesitas un dato muy específico que no encuentras, usa el panel izquierdo para pedirme que <b>lea a fondo</b> un documento completo.
-                    </div>
+                <div id="chat-history" class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-slate-950/30">
+                    <!-- El contenido se inicializa dinámicamente -->
                 </div>
                 
                 <div class="p-4 border-t border-slate-800 bg-slate-900 flex gap-2">
-                    <input type="text" id="chat-input" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:border-blue-500 outline-none shadow-inner" placeholder="Escribe tu pregunta jurídica aquí..." onkeypress="if(event.key === 'Enter') window.logic.sendChatMessage()">
-                    <button onclick="window.logic.sendChatMessage()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition shadow-lg shadow-blue-900/20">
+                    <input type="text" id="chat-input" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:border-indigo-500 outline-none shadow-inner placeholder-slate-600" placeholder="Escribe tu pregunta jurídica..." onkeypress="if(event.key === 'Enter') window.logic.sendChatMessage()">
+                    <button onclick="window.logic.sendChatMessage()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition shadow-lg shadow-indigo-900/20">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
                     </button>
                 </div>
@@ -148,38 +191,39 @@
     </div>
 
     <!-- LOADING OVERLAY -->
-    <div id="loading-overlay" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center z-[100]">
-        <div class="loader mb-4"></div>
-        <p class="text-slate-400 text-sm animate-pulse font-mono tracking-wide" id="loading-text">Inicializando sistemas judiciales...</p>
+    <div id="loading-overlay" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center z-[300]">
+        <div class="loader mb-6"></div>
+        <p class="text-slate-300 text-sm animate-pulse font-medium tracking-wide uppercase" id="loading-text">Inicializando sistema...</p>
     </div>
 
     <!-- MODALES GENÉRICOS -->
-    <div id="confirm-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-sm w-full p-6">
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-w-sm w-full p-6 transform scale-100 transition-transform">
             <h3 id="confirm-title" class="text-lg font-bold text-white mb-2">Confirmar</h3>
             <p id="confirm-message" class="text-slate-300 text-sm mb-6 leading-relaxed">¿Seguro?</p>
             <div class="flex justify-end gap-3">
-                <button id="confirm-cancel" class="px-4 py-2 rounded text-slate-400 hover:text-white text-sm">Cancelar</button>
-                <button id="confirm-ok" class="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-bold text-sm">Confirmar</button>
+                <button id="confirm-cancel" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white text-sm hover:bg-slate-800 transition">Cancelar</button>
+                <button id="confirm-ok" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-lg shadow-indigo-900/30 transition">Confirmar</button>
             </div>
         </div>
     </div>
 
-    <div id="input-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-sm w-full p-6">
+    <div id="input-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-w-sm w-full p-6">
             <h3 id="input-title" class="text-lg font-bold text-white mb-4">Datos</h3>
-            <input type="text" id="input-field" class="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none mb-6 font-mono text-sm" autocomplete="off">
+            <input type="text" id="input-field" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:border-indigo-500 outline-none mb-6 font-mono text-sm shadow-inner" autocomplete="off">
             <div class="flex justify-end gap-3">
-                <button id="input-cancel" class="px-4 py-2 rounded text-slate-400 hover:text-white text-sm">Cancelar</button>
-                <button id="input-ok" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm">Aceptar</button>
+                <button id="input-cancel" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white text-sm hover:bg-slate-800 transition">Cancelar</button>
+                <button id="input-ok" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-lg shadow-indigo-900/30 transition">Aceptar</button>
             </div>
         </div>
     </div>
 
     <!-- TOASTS -->
-    <div id="toast-container" class="fixed bottom-5 right-5 z-[300] flex flex-col gap-2 pointer-events-none"></div>
+    <div id="toast-container" class="fixed bottom-5 right-5 z-[300] flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4 md:px-0"></div>
 
     <script>
+        // CONFIGURACION
         const firebaseConfig = {
             apiKey: "AIzaSyCP0FlSV9PECEVq6iWJ6ajT7b0yzRcVggw",
             authDomain: "perfilador-penitenciario.firebaseapp.com",
@@ -188,12 +232,13 @@
             messagingSenderId: "449122558886",
             appId: "1:449122558886:web:b440366cb44f8ec2252567"
         };
-
-        // IMPORTANTE: PEGA TU NUEVA API KEY AQUÍ ENTRE LAS COMILLAS
-        const apiKey = "AIzaSyBRzsFTxqfP382htEEyvS1spx8p7TubLFY"; // <--- TU NUEVA KEY AQUI
+        
+        // SEGURIDAD: La API Key de Gemini ya no está en el código.
+        // Se cargará dinámicamente desde Firestore (colección 'config', documento 'keys').
         
         const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
-
+        
+        // ESTADO GLOBAL
         window.state = {
             user: null,
             role: 'consulta',
@@ -202,9 +247,11 @@
             isProcessing: false,
             searchQuery: "",
             lastLocalUpdate: 0,
-            chatFullContext: ""
+            chatFullContext: "",
+            apiKey: null // Aquí se guardará la llave una vez descargada
         };
 
+        // INICIALIZACION
         window.onload = function() {
             try {
                 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
@@ -212,20 +259,34 @@
                 firebase.auth().onAuthStateChanged((user) => {
                     window.state.user = user;
                     window.ui.setLoading(false);
-
                     if (user) {
+                        // --- PASO CRÍTICO: CARGAR API KEY DESDE FIRESTORE ---
+                        const db = firebase.firestore();
+                        db.collection('config').doc('keys').get()
+                            .then(doc => {
+                                if (doc.exists && doc.data().gemini) {
+                                    window.state.apiKey = doc.data().gemini;
+                                    console.log("Sistema IA: Credenciales seguras cargadas.");
+                                } else {
+                                    console.warn("ATENCIÓN: Debes crear la colección 'config', documento 'keys', campo 'gemini' en Firestore.");
+                                    window.ui.showToast("Falta configuración de IA en base de datos", "error");
+                                }
+                            })
+                            .catch(err => console.error("Error obteniendo credenciales:", err));
+                        // ----------------------------------------------------
+
                         const storedRole = localStorage.getItem('user_role_pref') || 'consulta';
                         window.state.role = storedRole;
                         
                         document.getElementById('user-info').classList.remove('hidden');
                         document.getElementById('user-email').textContent = user.email;
-                        document.getElementById('user-role-badge').textContent = storedRole;
                         
                         const badge = document.getElementById('user-role-badge');
-                        if (storedRole === 'juez') badge.className = "text-[10px] bg-yellow-900/50 text-yellow-400 px-2 py-0.5 rounded uppercase font-bold tracking-wider border border-yellow-700";
-                        else if (storedRole === 'secretario') badge.className = "text-[10px] bg-blue-900/50 text-blue-400 px-2 py-0.5 rounded uppercase font-bold tracking-wider border border-blue-700";
-                        else badge.className = "text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded uppercase font-bold tracking-wider border border-slate-600";
-
+                        badge.textContent = storedRole;
+                        if (storedRole === 'juez') badge.className = "text-[10px] bg-amber-900/40 text-amber-400 px-2 py-0.5 rounded border border-amber-700/50 uppercase font-bold tracking-wider";
+                        else if (storedRole === 'secretario') badge.className = "text-[10px] bg-indigo-900/40 text-indigo-400 px-2 py-0.5 rounded border border-indigo-700/50 uppercase font-bold tracking-wider";
+                        else badge.className = "text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700 uppercase font-bold tracking-wider";
+                        
                         window.app.renderDashboard();
                         window.app.subscribeToInmates();
                     } else {
@@ -233,50 +294,46 @@
                         window.app.renderLogin();
                     }
                 });
-
+                
                 document.getElementById('confirm-cancel').onclick = window.ui.hideConfirm;
                 document.getElementById('input-cancel').onclick = window.ui.hideInput;
-
             } catch (error) {
                 console.error("Init Error:", error);
-                alert("Error inicializando.");
+                alert("Error crítico inicializando.");
             }
         };
 
+        // --- UI HELPERS ---
         window.ui = {
             confirmCallback: null,
             cancelCallback: null, 
             inputCallback: null,
-
             setLoading: (show, msg) => {
                 const el = document.getElementById('loading-overlay');
                 if(!el) return;
                 el.classList.toggle('hidden', !show);
                 if(show && msg) el.querySelector('p').textContent = msg;
             },
-
             showToast: (msg, type = 'info') => {
                 const c = document.getElementById('toast-container');
                 if(!c) return;
                 const d = document.createElement('div');
-                let colors = 'bg-slate-800 border-slate-600';
+                let colors = 'bg-slate-800 border-slate-700 text-slate-200';
                 let icon = 'ℹ️';
-
-                if (type === 'success') { colors = 'bg-green-900/90 border-green-700 text-white'; icon = '✅'; }
-                if (type === 'error') { colors = 'bg-red-900/90 border-red-700 text-white'; icon = '⚠️'; }
-                if (type === 'update') { colors = 'bg-blue-900/90 border-blue-700 text-white'; icon = '🔔'; }
-
-                d.className = `pointer-events-auto px-4 py-3 rounded shadow-lg border text-xs md:text-sm text-white flex items-center gap-3 animate-[slideIn_0.3s_ease-out] mb-2 backdrop-blur-sm ${colors}`;
-                d.innerHTML = `<span class="text-lg">${icon}</span><span>${msg}</span>`;
+                if (type === 'success') { colors = 'bg-emerald-900/90 border-emerald-700 text-emerald-100'; icon = '✅'; }
+                if (type === 'error') { colors = 'bg-red-900/90 border-red-700 text-red-100'; icon = '⚠️'; }
+                if (type === 'update') { colors = 'bg-indigo-900/90 border-indigo-700 text-indigo-100'; icon = '🔔'; }
+                
+                d.className = `pointer-events-auto px-4 py-3 rounded-lg shadow-xl border text-sm flex items-center gap-3 animate-[slideIn_0.3s_ease-out] mb-2 backdrop-blur-md ${colors}`;
+                d.innerHTML = `<span class="text-lg">${icon}</span><span class="font-medium">${msg}</span>`;
                 c.appendChild(d);
                 setTimeout(() => {
                     d.style.transition = 'all 0.5s ease';
                     d.style.opacity = '0';
                     d.style.transform = 'translateY(10px)';
                     setTimeout(() => d.remove(), 500);
-                }, 5000);
+                }, 4000);
             },
-
             showConfirm: (title, msg, onConfirm, onCancel = null) => {
                 const modal = document.getElementById('confirm-modal');
                 document.getElementById('confirm-title').textContent = title;
@@ -300,14 +357,12 @@
                 
                 modal.classList.remove('hidden');
             },
-            
             hideConfirm: () => { 
                 const modal = document.getElementById('confirm-modal');
                 modal.classList.add('hidden'); 
                 window.ui.confirmCallback = null; 
                 window.ui.cancelCallback = null;
             },
-
             showInput: (title, placeholder, callback) => {
                 const modal = document.getElementById('input-modal');
                 const input = document.getElementById('input-field');
@@ -342,13 +397,26 @@
                         const date = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString() : 'S/F';
                         let icon = '📝'; let color = 'text-slate-300';
                         if (data.action.includes('Elimin')) { icon = '🗑️'; color = 'text-red-400'; }
-                        if (data.action.includes('Creaci')) { icon = '✨'; color = 'text-green-400'; }
-                        return `<div class="bg-slate-800/50 p-3 rounded border border-slate-700 text-sm"><div class="flex justify-between items-start mb-1"><span class="font-bold ${color} flex items-center gap-1">${icon} ${data.action}</span><span class="text-[10px] text-slate-500">${date}</span></div><p class="text-xs text-slate-300 mb-1">${data.details}</p><div class="text-[10px] text-slate-500 border-t border-slate-700 pt-1 mt-2">Usuario: <span class="text-slate-400">${data.userEmail}</span></div></div>`;
+                        if (data.action.includes('Creaci')) { icon = '✨'; color = 'text-emerald-400'; }
+                        return `<div class="bg-slate-800/50 p-3 rounded-lg border border-slate-700 text-sm"><div class="flex justify-between items-start mb-1"><span class="font-bold ${color} flex items-center gap-2">${icon} ${data.action}</span><span class="text-[10px] text-slate-500">${date}</span></div><p class="text-xs text-slate-300 mb-2">${data.details}</p><div class="text-[10px] text-slate-500 border-t border-slate-700 pt-1 mt-1 flex justify-between"><span>Usuario:</span> <span class="text-slate-400">${data.userEmail}</span></div></div>`;
                     }).join('');
-                } catch (e) { list.innerHTML = '<p class="text-center text-red-500 text-sm">Error.</p>'; }
+                } catch (e) { list.innerHTML = '<p class="text-center text-red-500 text-sm">Error cargando auditoría.</p>'; }
             },
             closeAudit: () => { document.getElementById('audit-drawer').classList.remove('open'); document.getElementById('audit-drawer').classList.add('closed'); document.getElementById('audit-overlay').classList.add('hidden'); },
+            
+            // --- FUNCIONES NUEVAS PARA LEER NOTAS ---
+            viewNote: (idx) => {
+                const doc = window.state.selectedInmate.documents[idx];
+                if (!doc) return;
+                
+                // Usar marked para renderizar el texto de la nota con formato
+                document.getElementById('note-content').innerHTML = marked.parse(doc.keyFindings);
+                document.getElementById('note-modal').classList.remove('hidden');
+            },
+            closeNote: () => document.getElementById('note-modal').classList.add('hidden'),
+            // ---------------------------------------
 
+            // --- LIMPIEZA AUTOMÁTICA DEL CHAT ---
             openChat: () => {
                 document.getElementById('chat-modal').classList.remove('hidden');
                 document.getElementById('chat-input').focus();
@@ -356,7 +424,14 @@
                 window.ui.renderChatDocsList();
                 document.getElementById('chat-context-status').textContent = "Contexto: Resúmenes básicos";
                 document.getElementById('chat-context-status').className = "text-[10px] text-slate-500";
+                
+                document.getElementById('chat-history').innerHTML = `
+                    <div class="chat-ai chat-bubble">
+                        Hola. Soy tu Asistente Jurídico especialista en Ejecución Penal. 
+                        <br>Estoy listo para responder sobre este legajo o la Ley 24.660.
+                    </div>`;
             },
+            
             closeChat: () => document.getElementById('chat-modal').classList.add('hidden'),
             
             renderChatDocsList: () => {
@@ -364,44 +439,48 @@
                 const docs = window.state.selectedInmate?.documents || [];
                 
                 if(docs.length === 0) {
-                    list.innerHTML = '<p class="text-xs text-slate-600 text-center mt-4">Sin documentos.</p>';
+                    list.innerHTML = '<p class="text-xs text-slate-600 text-center mt-4">Sin documentos en el legajo.</p>';
                     return;
                 }
-
                 list.innerHTML = docs.map((doc, idx) => `
-                    <div class="bg-slate-800 p-2 rounded border border-slate-700 hover:border-blue-500 transition flex justify-between items-center group">
+                    <div class="bg-slate-800 p-2.5 rounded border border-slate-700 hover:border-indigo-500 transition flex justify-between items-center group cursor-pointer" onclick="window.logic.loadFullDocForChat('${doc.url}', ${idx})">
                         <div class="overflow-hidden">
-                            <div class="text-[10px] font-bold text-blue-400 truncate">${doc.documentType}</div>
+                            <div class="text-[11px] font-bold text-indigo-400 truncate">${doc.documentType}</div>
                             <div class="text-[9px] text-slate-500 truncate">${doc.documentDate || 'S/F'}</div>
                         </div>
-                        <button onclick="window.logic.loadFullDocForChat('${doc.url}', ${idx})" 
-                            class="bg-slate-700 hover:bg-blue-600 text-white p-1.5 rounded shadow transition" title="Analizar a fondo este documento">
-                            👁️
-                        </button>
+                        <button class="text-slate-500 hover:text-indigo-400 p-1">👁️</button>
                     </div>
                 `).join('');
             },
-
             addChatMessage: (text, sender) => {
                 const history = document.getElementById('chat-history');
                 const div = document.createElement('div');
                 div.className = `chat-bubble ${sender === 'user' ? 'chat-user' : (sender === 'system' ? 'chat-system' : 'chat-ai')}`;
                 div.innerHTML = sender === 'ai' ? marked.parse(text) : text;
+                
+                if (sender === 'ai') {
+                    const btn = document.createElement('button');
+                    btn.className = "mt-3 text-[10px] flex items-center gap-1.5 text-indigo-300 hover:text-white border border-indigo-500/30 bg-indigo-900/20 px-2 py-1 rounded transition-colors";
+                    btn.innerHTML = '<span>💾</span> Guardar como Nota';
+                    btn.onclick = () => window.logic.saveChatToProfile(text);
+                    div.appendChild(btn);
+                }
+                
                 history.appendChild(div);
                 history.scrollTop = history.scrollHeight;
             },
-
             setupDragAndDrop: (id, cb) => {
                 const el = document.getElementById(id);
                 if(!el) return;
                 const inp = el.querySelector('input');
                 el.onclick = () => inp.click();
-                el.ondragover = e => { e.preventDefault(); el.classList.add('bg-slate-800'); };
-                el.ondragleave = () => el.classList.remove('bg-slate-800');
-                el.ondrop = e => { e.preventDefault(); el.classList.remove('bg-slate-800'); if(e.dataTransfer.files[0]) cb(e.dataTransfer.files); };
+                el.ondragover = e => { e.preventDefault(); el.classList.add('dragover'); };
+                el.ondragleave = () => el.classList.remove('dragover');
+                el.ondrop = e => { e.preventDefault(); el.classList.remove('dragover'); if(e.dataTransfer.files[0]) cb(e.dataTransfer.files); };
             }
         };
 
+        // --- HELPERS LÓGICOS ---
         window.helpers = {
             extractNativeTextPDF: async (file) => {
                 const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
@@ -467,8 +546,15 @@
                     reader.readAsDataURL(file);
                 });
             },
+            // --- MODIFICADO: USA LA CLAVE DESCARGADA DE BD ---
             callGeminiJSON: async (prompt) => {
-                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
+                const key = window.state.apiKey;
+                if (!key) {
+                    window.ui.showToast("Cargando credenciales... intente de nuevo", "info");
+                    throw new Error("Espere a que se carguen las credenciales de seguridad.");
+                }
+
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -484,8 +570,11 @@
                 return JSON.parse(txt.replace(/```json|```/g, ''));
             },
             callGeminiVisionJSON: async (prompt, base64Image) => {
+                const key = window.state.apiKey;
+                if (!key) throw new Error("Espere a que se carguen las credenciales.");
+
                 const base64Data = base64Image.split(',')[1];
-                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -501,7 +590,13 @@
                 return JSON.parse(txt.replace(/```json|```/g, ''));
             },
             callGeminiFreeText: async (prompt) => {
-                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
+                const key = window.state.apiKey;
+                if (!key) {
+                    window.ui.addChatMessage("⚠️ Error: Credenciales no cargadas. Revise su conexión.", "system");
+                    throw new Error("Credenciales no disponibles.");
+                }
+
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -514,6 +609,7 @@
             }
         };
 
+        // --- LÓGICA DE NEGOCIO ---
         window.logic = {
             logAudit: async (inmateId, action, details) => {
                 try {
@@ -522,89 +618,43 @@
                     });
                 } catch (e) { console.error("Error log:", e); }
             },
-
-            // FUNCIÓN DE MANTENIMIENTO: LIMPIAR DUPLICADOS EXISTENTES
-            checkAndCleanDuplicates: async () => {
-                if (window.state.role !== 'juez') return window.ui.showToast("Permiso denegado: Solo Juez.", "error");
-                
-                window.ui.setLoading(true, "Escaneando base de datos...");
-                
-                const groups = {};
-                window.state.inmates.forEach(i => {
-                    const id = String(i.inmateId).trim().toLowerCase();
-                    if (!groups[id]) groups[id] = [];
-                    groups[id].push(i);
-                });
-
-                const duplicateGroups = Object.values(groups).filter(g => g.length > 1);
-                
-                if (duplicateGroups.length === 0) {
-                    window.ui.setLoading(false);
-                    window.ui.showToast("No se encontraron duplicados.", "success");
-                    return;
+            loadFullDocForChat: async (docUrl, idx) => {
+                // FIX: Check if it is a text note
+                if (docUrl === '#NOTE') {
+                     const doc = window.state.selectedInmate.documents[idx];
+                     const noteContent = doc.keyFindings;
+                     window.state.chatFullContext += `\n\n=== NOTA GUARDADA #${idx + 1} (ASISTENTE IA) ===\n${noteContent}\n===================================\n`;
+                     window.ui.addChatMessage(`✅ Nota #${idx + 1} agregada al contexto.`, 'system');
+                     const statusEl = document.getElementById('chat-context-status');
+                     statusEl.textContent = "Contexto: Resúmenes + Notas + Docs Completos";
+                     statusEl.className = "text-[10px] text-emerald-400 font-bold animate-pulse";
+                     return;
                 }
 
-                const totalToDelete = duplicateGroups.reduce((acc, g) => acc + (g.length - 1), 0);
-
-                window.ui.setLoading(false);
-                window.ui.showConfirm(
-                    "🧹 Depuración de Base de Datos", 
-                    `Se encontraron ${duplicateGroups.length} grupos de duplicados (Total ${totalToDelete} registros sobrantes).\n\n¿Desea eliminarlos? Se conservará el registro con más documentos o el más antiguo.`,
-                    async () => {
-                        window.ui.setLoading(true, "Limpiando duplicados...");
-                        const db = firebase.firestore();
-                        const batch = db.batch();
-                        
-                        duplicateGroups.forEach(group => {
-                            // Ordenar: Primero por cantidad de docs (desc), luego por fecha creación (asc)
-                            group.sort((a, b) => {
-                                const docsA = a.documents?.length || 0;
-                                const docsB = b.documents?.length || 0;
-                                if (docsA !== docsB) return docsB - docsA; // Mayor cantidad de docs gana
-                                
-                                // Si tienen mismos docs, el mas viejo gana (asumimos es el original)
-                                const dateA = a.createdAt?.seconds || 0;
-                                const dateB = b.createdAt?.seconds || 0;
-                                return dateA - dateB;
-                            });
-
-                            // El primero se queda, el resto se borra
-                            const toDelete = group.slice(1);
-                            toDelete.forEach(d => {
-                                const ref = db.collection('inmate_profiles').doc(d.id);
-                                batch.delete(ref);
-                            });
-                        });
-
-                        window.state.lastLocalUpdate = Date.now();
-                        await batch.commit();
-                        window.ui.showToast(`✅ Limpieza completada. ${totalToDelete} registros eliminados.`, "success");
-                        window.ui.setLoading(false);
-                    }
-                );
-            },
-
-            loadFullDocForChat: async (docUrl, idx) => {
                 window.ui.addChatMessage(`📥 Descargando y leyendo documento #${idx + 1}...`, 'system');
-                
                 try {
                     let arrayBuffer;
                     let mimeType;
                     try {
-                        const response = await fetch(docUrl);
+                        // --- ACTUALIZACIÓN CORS ---
+                        // Añadimos un parámetro de tiempo para evitar cachés y forzamos modo CORS
+                        const urlWithCache = docUrl.includes('?') ? `${docUrl}&t=${Date.now()}` : `${docUrl}?t=${Date.now()}`;
+                        
+                        const response = await fetch(urlWithCache, { method: 'GET', mode: 'cors' });
                         if (!response.ok) throw new Error(`HTTP ${response.status}`);
                         const blob = await response.blob();
                         arrayBuffer = await blob.arrayBuffer();
                         mimeType = blob.type;
                     } catch (fetchErr) {
-                        console.warn("Fetch error", fetchErr);
-                        throw new Error("No se pudo descargar el archivo (CORS/Network).");
+                        // --- MENSAJE DE ERROR ESPECÍFICO PARA CORS ---
+                        console.error("Fetch failed details:", fetchErr);
+                        window.ui.addChatMessage("⚠️ <b>Error de Seguridad (CORS)</b><br>El servidor de archivos (Firebase Storage) rechazó la descarga. Esto es una configuración de seguridad de la nube, no un error del código.<br><br><b>SOLUCIÓN TÉCNICA:</b><br>Debe ejecutar el siguiente comando en su consola de Google Cloud para permitir descargas desde su dominio:<br><code>gsutil cors set cors.json gs://perfilador-penitenciario.appspot.com</code>", 'system');
+                        throw new Error("Acceso denegado por CORS. Ver instrucciones en el chat.");
                     }
                     
                     const bufferForOCR = arrayBuffer.slice(0);
                     let fullText = "";
                     let source = "";
-
                     if (mimeType && mimeType.startsWith('image/')) {
                          window.ui.addChatMessage(`🖼️ Imagen detectada. Iniciando OCR directo...`, 'system');
                          const imageBlob = new Blob([bufferForOCR], {type: mimeType});
@@ -618,91 +668,90 @@
                         try {
                             fullText = await window.helpers.extractFullTextPDF(arrayBuffer);
                             source = "Texto Nativo";
-
                             if (fullText.length < 300) {
-                                window.ui.addChatMessage(`⚠️ Texto nativo insuficiente (${fullText.length} cars). Aplicando OCR a primeras 3 páginas...`, 'system');
+                                window.ui.addChatMessage(`⚠️ Texto nativo insuficiente. Aplicando OCR...`, 'system');
                                 try {
                                     fullText = await window.helpers.ocrFromBuffer(bufferForOCR);
                                     source = "OCR (Escaneo PDF)";
-                                } catch (ocrErr) {
-                                    console.error("OCR Error details:", ocrErr);
-                                    throw new Error(`Falló el OCR: ${ocrErr.message || ocrErr}`);
-                                }
+                                } catch (ocrErr) { throw new Error(`Falló el OCR: ${ocrErr.message || ocrErr}`); }
                             }
                         } catch (e) {
-                            if (e.name === 'InvalidPDFException' || (e.message && e.message.includes('Invalid PDF'))) {
-                                window.ui.addChatMessage(`⚠️ Archivo no es un PDF válido. Intentando lectura visual...`, 'system');
+                             if (e.name === 'InvalidPDFException' || (e.message && e.message.includes('Invalid PDF'))) {
+                                window.ui.addChatMessage(`⚠️ PDF no estándar. Intentando lectura visual...`, 'system');
                                 const imageBlob = new Blob([bufferForOCR]);
                                 const worker = await Tesseract.createWorker('spa');
                                 const ret = await worker.recognize(imageBlob);
                                 await worker.terminate();
                                 fullText = ret.data.text;
                                 source = "OCR (Forzado)";
-                            } else {
-                                throw e;
-                            }
+                            } else { throw e; }
                         }
                     }
-
                     if (!fullText || fullText.length < 50) throw new Error("Documento ilegible o vacío.");
-
-                    window.state.chatFullContext += `\n\n=== CONTENIDO COMPLETO DEL DOCUMENTO #${idx + 1} (${source}) ===\n${fullText}\n===================================\n`;
-                    
-                    window.ui.addChatMessage(`✅ Documento #${idx + 1} procesado (${source}) y memorizado (${fullText.length} caracteres).`, 'system');
-                    
+                    window.state.chatFullContext += `\n\n=== DOC #${idx + 1} (${source}) ===\n${fullText}\n===================================\n`;
+                    window.ui.addChatMessage(`✅ Doc #${idx + 1} cargado (${source}).`, 'system');
                     const statusEl = document.getElementById('chat-context-status');
-                    statusEl.textContent = "Contexto: Resúmenes + Documentos Completos cargados";
-                    statusEl.className = "text-[10px] text-green-400 font-bold animate-pulse";
-
+                    statusEl.textContent = "Contexto: Resúmenes + Docs Completos";
+                    statusEl.className = "text-[10px] text-emerald-400 font-bold animate-pulse";
                 } catch (e) {
                     console.error(e);
                     window.ui.addChatMessage(`❌ Error leyendo documento: ${e.message}`, 'system');
                 }
             },
-
             sendChatMessage: async () => {
                 const input = document.getElementById('chat-input');
                 const question = input.value.trim();
                 if (!question) return;
-
                 window.ui.addChatMessage(question, 'user');
                 input.value = '';
-
                 const inmate = window.state.selectedInmate;
                 const docs = inmate.documents || [];
                 
-                // Construir Contexto Híbrido: Resúmenes + Texto Completo Cargado
+                // --- CORRECCIÓN 1: CÁLCULO DEL SALUDO SEGÚN HORA LOCAL ---
+                const hour = new Date().getHours();
+                let timeGreeting = "Buenos días";
+                if (hour >= 13 && hour < 20) timeGreeting = "Buenas tardes";
+                else if (hour >= 20 || hour < 6) timeGreeting = "Buenas noches";
+                // ---------------------------------------------------------
+
                 let contextText = `Estás analizando el legajo judicial de ${inmate.fullName} (ID: ${inmate.inmateId}).\n\n`;
-                
                 contextText += "--- RESÚMENES DISPONIBLES ---\n";
                 if (docs.length === 0) contextText += "No hay documentos cargados.\n";
                 else docs.forEach((d, i) => {
                     contextText += `[Doc ${i+1}] Tipo: ${d.documentType}. Fecha: ${d.documentDate}. Resumen: ${d.keyFindings}\n`;
                 });
-
                 if (window.state.chatFullContext) {
                     contextText += "\n--- CONTENIDO COMPLETO DE DOCUMENTOS CARGADOS ---\n" + window.state.chatFullContext;
                 }
-
-                // NUEVO PROMPT HÍBRIDO: Permite conocimiento general si no es específico del caso
+                
+                // --- CORRECCIÓN 2: PROMPT CON INSTRUCCIONES DE SEPARACIÓN Y HORA ---
                 const prompt = `
-                    CONTEXTO DEL CASO:
+                    ROL: Eres un Asistente Jurídico experto en Derecho Penal Argentino y Ejecución Penal (Ley 24.660).
+                    CONTEXTO TEMPORAL: En este momento son las ${hour} horas. El saludo correcto es "${timeGreeting}".
+                    
+                    CONTEXTO DEL CASO ACTUAL (Datos del interno):
                     ${contextText}
-
+                    
                     PREGUNTA DEL USUARIO: "${question}"
-
-                    INSTRUCCIONES PARA EL ASISTENTE JURÍDICO:
-                    1. DATOS DEL CASO: Si la pregunta se refiere a hechos, fechas o personas de ESTE legajo específico, responde ÚNICAMENTE basándote en la información provista arriba. Si el dato no está, di "No consta en los documentos analizados".
-                    2. CONOCIMIENTO LEGAL GENERAL: Si la pregunta es teórica, conceptual o sobre leyes generales (ej: "¿Qué es el habeas corpus?", "Plazos procesales"), responde usando tu amplio conocimiento jurídico general, sin limitarte a los documentos.
-                    3. CITA FUENTES: Cuando uses información de los documentos, indica cuál usaste (ej: "[Doc 1]").
+                    
+                    INSTRUCCIONES DE RAZONAMIENTO (CRÍTICO):
+                    1. ANALIZA LA INTENCIÓN: Determina si el usuario hace una "Pregunta Teórica/General" o una "Pregunta sobre el Caso".
+                    2. SI ES TEÓRICA (ej: "¿Qué dice el art 17?", "¿Cuáles son los requisitos de la semilibertad?"):
+                       - Responde EXCLUSIVAMENTE con la base legal (Ley 24.660).
+                       - **PROHIBIDO** mencionar al interno, sus documentos o su salud en esta respuesta, para no confundir teoría con práctica.
+                    3. SI ES SOBRE EL CASO (ej: "¿Este interno cumple los requisitos?", "¿Qué salud tiene?"):
+                       - Ahí SÍ cruza la ley con el "CONTEXTO DEL CASO ACTUAL" provisto arriba.
+                    
+                    LEGISLACIÓN: Ley Nacional 24.660. Art 17 refiere a Salidas Transitorias y Semilibertad.
+                    ESTILO: Formal, preciso y directo.
                 `;
+                // -------------------------------------------------------------------
 
                 const loadingDiv = document.createElement('div');
                 loadingDiv.className = 'chat-bubble chat-ai animate-pulse';
-                loadingDiv.textContent = 'Analizando...';
+                loadingDiv.textContent = 'Analizando jurisprudencia...';
                 loadingDiv.id = 'chat-loading';
                 document.getElementById('chat-history').appendChild(loadingDiv);
-
                 try {
                     const answer = await window.helpers.callGeminiFreeText(prompt);
                     document.getElementById('chat-loading').remove();
@@ -712,143 +761,129 @@
                     window.ui.addChatMessage(`Error: ${e.message}`, 'ai');
                 }
             },
+            
+            // --- MEJORA 2: GUARDADO INSTANTÁNEO ---
+            saveChatToProfile: (text) => {
+                if (!window.state.selectedInmate) return;
+                window.ui.showConfirm("Guardar en Legajo", "¿Desea convertir esta respuesta en una nota oficial del expediente?", async () => {
+                    window.ui.setLoading(true, "Guardando nota...");
+                    try {
+                        const newDoc = {
+                            documentType: "ASISTENTE IA", 
+                            documentDate: new Date().toISOString().split('T')[0],
+                            keyFindings: text, 
+                            url: '#NOTE', 
+                            uploadedAt: new Date().toISOString()
+                        };
+                        
+                        await firebase.firestore().collection('inmate_profiles').doc(window.state.selectedInmate.id).update({
+                            documents: firebase.firestore.FieldValue.arrayUnion(newDoc)
+                        });
+                        
+                        // Actualizar visualmente al instante
+                        if(!window.state.selectedInmate.documents) window.state.selectedInmate.documents = [];
+                        window.state.selectedInmate.documents.push(newDoc);
+                        window.app.renderInmateDetail(); // Forzar repintado de la vista detalle
+
+                        window.logic.logAudit(window.state.selectedInmate.id, "Nota IA Agregada", "Se guardó una consulta del asistente.");
+                        window.app.selectInmate(window.state.selectedInmate.id); 
+                        window.ui.showToast("Nota guardada en el expediente", 'success');
+                    } catch (e) {
+                        window.ui.showToast("Error: " + e.message, 'error');
+                    } finally {
+                        window.ui.setLoading(false);
+                    }
+                });
+            },
 
             processMassList: async (file) => {
                 if (window.state.role === 'consulta') return window.ui.showToast("Permiso denegado", "error");
                 if (!file || file.type !== 'application/pdf') return window.ui.showToast('Use PDF para carga masiva', 'error');
-                
-                window.ui.setLoading(true, "Analizando lista y filtrando nuevos...");
+                window.ui.setLoading(true, "Analizando lista...");
                 try {
                     const text = await window.helpers.extractNativeTextPDF(file);
-                    if (text.length < 50) throw new Error("PDF escaneado/imagen no soportado para listas masivas.");
-                    
                     const result = await window.helpers.callGeminiJSON(`
-                        Extrae lista de internos. 
-                        Salida JSON Array: [{"inmateId": "string", "fullName": "string", "crimeSummary": "corto"}]. 
+                        Extrae lista de internos. JSON Array: [{"inmateId": "string", "fullName": "string", "crimeSummary": "corto"}]. 
                         Texto: ${text.substring(0, 30000)}
                     `);
-                    
                     if (!Array.isArray(result)) throw new Error("Formato inválido de IA");
-
-                    // --- FILTRADO AUTOMÁTICO ---
-                    // Crear un Set con los IDs existentes para búsqueda rápida
+                    
                     const existingIds = new Set(window.state.inmates.map(i => String(i.inmateId).trim().toLowerCase()));
                     const newInmates = [];
                     let duplicatesCount = 0;
-
                     result.forEach(item => {
                         if (!item.inmateId) return;
                         const normalizedId = String(item.inmateId).trim().toLowerCase();
-
-                        if (existingIds.has(normalizedId)) {
-                            duplicatesCount++; // Ya existe, lo ignoramos
-                        } else {
-                            newInmates.push(item);
-                            // Agregamos al Set temporal para evitar duplicados dentro del MISMO archivo PDF actual
-                            existingIds.add(normalizedId);
-                        }
+                        if (existingIds.has(normalizedId)) duplicatesCount++;
+                        else { newInmates.push(item); existingIds.add(normalizedId); }
                     });
-
+                    
                     window.ui.setLoading(false);
-
                     if (newInmates.length > 0) {
-                        // Guardar solo los nuevos automáticamente
                         await window.logic.saveMassBatch(newInmates);
-                        window.ui.showToast(`✅ Proceso terminado: ${newInmates.length} perfiles nuevos agregados. (${duplicatesCount} duplicados ignorados)`, 'success');
+                        window.ui.showToast(`✅ ${newInmates.length} perfiles creados. (${duplicatesCount} duplicados)`, 'success');
                     } else {
-                        window.ui.showToast(`⚠️ No se encontraron perfiles nuevos. ${duplicatesCount} registros ya existían en la base de datos.`, 'info');
+                        window.ui.showToast(`⚠️ Sin nuevos ingresos. ${duplicatesCount} duplicados.`, 'info');
                     }
-
-                } catch (e) { 
-                    window.ui.setLoading(false);
-                    window.ui.showToast(e.message, 'error'); 
-                }
+                } catch (e) { window.ui.setLoading(false); window.ui.showToast(e.message, 'error'); }
             },
-
-            // (Función handleOverwrite eliminada ya que no se usa en este flujo simplificado)
-
             saveMassBatch: async (inmatesList) => {
-                window.ui.setLoading(true, `Guardando ${inmatesList.length} nuevos perfiles...`);
+                window.ui.setLoading(true, `Registrando ${inmatesList.length} perfiles...`);
                 try {
                     const db = firebase.firestore();
                     const batch = db.batch();
-                    
                     inmatesList.forEach(item => {
                         const ref = db.collection('inmate_profiles').doc();
                         batch.set(ref, { 
-                            ...item, 
-                            inmateId: item.inmateId.trim(),
-                            status: 'Activo', 
-                            documents: [], 
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp() 
+                            ...item, inmateId: item.inmateId.trim(), status: 'Activo', documents: [], createdAt: firebase.firestore.FieldValue.serverTimestamp() 
                         });
                     });
-
                     window.state.lastLocalUpdate = Date.now();
                     await batch.commit();
-                    
-                    // Log Audit para carga masiva
                     window.logic.logAudit("SISTEMA", "Carga Masiva", `Se importaron ${inmatesList.length} perfiles.`);
-
-                    window.ui.showToast(`✅ Éxito: ${inmatesList.length} perfiles importados.`, 'success');
-                } catch (e) {
-                    window.ui.showToast("Error al guardar: " + e.message, 'error');
-                } finally {
-                    window.ui.setLoading(false);
-                }
+                } catch (e) { window.ui.showToast("Error BD: " + e.message, 'error'); } finally { window.ui.setLoading(false); }
             },
-
             processDocument: async (file) => {
                 if (window.state.role === 'consulta') return window.ui.showToast("Solo lectura", "error");
                 if (!window.state.selectedInmate) return window.ui.showToast("Seleccione interno", 'error');
                 if (!file) return;
-                window.ui.setLoading(true, "Analizando documento...");
+                window.ui.setLoading(true, "Digitalizando...");
                 try {
                     let text = "";
                     if (file.type === 'application/pdf') {
                         text = await window.helpers.extractNativeTextPDF(file);
                         if (text.trim().length < 50) {
-                            window.ui.setLoading(true, "Aplicando OCR (Lento)...");
+                            window.ui.setLoading(true, "Aplicando OCR...");
                             text = await window.helpers.performOCR(file);
                         }
                     } else { text = await window.helpers.performOCR(file); }
                     if (text.length < 10) {
                         window.ui.setLoading(false); 
-                        window.ui.showConfirm("Lectura Difícil Detectada", "El escaneo automático falló. ¿Desea que la IA analice la imagen visualmente?", async () => { await window.logic.processDocumentWithVision(file); });
+                        window.ui.showConfirm("Lectura Difícil", "¿Usar IA Visual para analizar imagen?", async () => { await window.logic.processDocumentWithVision(file); });
                         return; 
                     }
-                    window.ui.setLoading(true, "Interpretando con IA...");
+                    window.ui.setLoading(true, "IA Analizando...");
                     const analysis = await window.helpers.callGeminiJSON(`
-                        Analiza texto judicial con rigor. 
-                        JSON exacto: {
-                            "documentDate": "YYYY-MM-DD", 
-                            "documentType": "Tipo (Sentencia, Informe, etc)", 
-                            "keyFindings": "Resumen detallado (aprox 80-100 palabras) que incluya: motivo principal, resolución o conclusión, fechas clave mencionadas y partes intervinientes si aplica."
-                        } 
+                        Analiza texto judicial. JSON: {"documentDate": "YYYY-MM-DD", "documentType": "Tipo", "keyFindings": "Resumen 80 palabras"}. 
                         Texto: ${text.substring(0, 25000)}
                     `);
                     await window.logic.saveDocumentToProfile(file, analysis);
                 } catch (e) { console.error(e); window.ui.showToast("Error: " + e.message, 'error'); } finally { if (window.state.isProcessing) window.ui.setLoading(false); }
             },
             processDocumentWithVision: async (file) => {
-                window.ui.setLoading(true, "Analizando visualmente con Gemini Vision...");
+                window.ui.setLoading(true, "IA Visual Analizando...");
                 try {
                     let base64Img = "";
                     if (file.type === 'application/pdf') base64Img = await window.helpers.pdfToImageBase64(file);
                     else base64Img = await window.helpers.fileToBase64(file);
                     const analysis = await window.helpers.callGeminiVisionJSON(`
-                        Analiza esta imagen de documento legal. 
-                        Extrae JSON exacto: {
-                            "documentDate": "YYYY-MM-DD", 
-                            "documentType": "Tipo", 
-                            "keyFindings": "Resumen detallado (aprox 80-100 palabras) describiendo el contenido visual, sellos, firmas y la resolución o contenido sustancial del escrito."
-                        }
+                        Analiza imagen legal. JSON: {"documentDate": "YYYY-MM-DD", "documentType": "Tipo", "keyFindings": "Resumen visual del escrito"}
                     `, base64Img);
                     await window.logic.saveDocumentToProfile(file, analysis);
-                } catch (e) { window.ui.showToast("Error en análisis visual: " + e.message, 'error'); } finally { window.ui.setLoading(false); }
+                } catch (e) { window.ui.showToast("Error Vision: " + e.message, 'error'); } finally { window.ui.setLoading(false); }
             },
             saveDocumentToProfile: async (file, analysis) => {
-                window.ui.setLoading(true, "Subiendo archivo...");
+                window.ui.setLoading(true, "Guardando...");
                 const ref = firebase.storage().ref().child(`docs/${window.state.selectedInmate.id}/${Date.now()}_${file.name}`);
                 await ref.put(file);
                 const url = await ref.getDownloadURL();
@@ -856,103 +891,77 @@
                 await firebase.firestore().collection('inmate_profiles').doc(window.state.selectedInmate.id).update({
                     documents: firebase.firestore.FieldValue.arrayUnion({ ...analysis, url, uploadedAt: new Date().toISOString() })
                 });
-                window.logic.logAudit(window.state.selectedInmate.id, "Documento Agregado", `Archivo: ${file.name}. Tipo: ${analysis.documentType}`);
+                window.logic.logAudit(window.state.selectedInmate.id, "Documento Agregado", `Tipo: ${analysis.documentType}`);
                 window.app.selectInmate(window.state.selectedInmate.id);
                 window.ui.setLoading(false);
-                window.ui.showToast("Documento agregado con éxito", 'success');
+                window.ui.showToast("Documento anexado correctamente", 'success');
             },
             deleteDocument: (docUrl) => {
-                if (window.state.role !== 'juez') return window.ui.showToast("Permiso denegado: Solo Juez puede eliminar.", "error");
-
-                window.ui.showConfirm("Eliminar Evidencia", "¿Está absolutamente seguro?", async () => {
-                    window.ui.setLoading(true, "Eliminando evidencia...");
+                if (window.state.role !== 'juez') return window.ui.showToast("Permiso denegado", "error");
+                window.ui.showConfirm("Eliminar Evidencia", "Esta acción es irreversible. ¿Confirmar?", async () => {
+                    window.ui.setLoading(true, "Eliminando...");
                     try {
                         const inmateId = window.state.selectedInmate.id;
                         const docRef = firebase.firestore().collection('inmate_profiles').doc(inmateId);
                         const snapshot = await docRef.get();
                         const currentDocs = snapshot.data().documents || [];
-                        
-                        const docToDelete = currentDocs.find(d => d.url === docUrl);
-                        let fileName = "Desconocido"; let docType = "Documento";
-                        if (docToDelete) {
-                            docType = docToDelete.documentType || "Documento";
-                            try { const path = decodeURIComponent(docUrl.split('/o/')[1].split('?')[0]); const fullName = path.split('/').pop(); fileName = fullName.split('_').slice(1).join('_') || fullName; } catch (e) {}
-                        }
-
                         const updatedDocs = currentDocs.filter(d => d.url !== docUrl);
                         window.state.lastLocalUpdate = Date.now();
                         await docRef.update({ documents: updatedDocs });
                         try { await firebase.storage().refFromURL(docUrl).delete(); } catch (e) {}
-                        window.logic.logAudit(inmateId, "Documento Eliminado", `Archivo: ${fileName}. Tipo: ${docType}`);
-                        window.ui.showToast(`Archivo "${fileName}" eliminado`, "success");
+                        window.logic.logAudit(inmateId, "Documento Eliminado", "Borrado manual por Juez");
+                        window.ui.showToast("Documento eliminado", "success");
                         window.state.selectedInmate.documents = updatedDocs;
                         window.app.renderInmateDetail();
                     } catch (e) { window.ui.showToast("Error: " + e.message, 'error'); } finally { window.ui.setLoading(false); }
                 });
             },
-            // NUEVA FUNCIÓN: Eliminar Perfil Completo
             deleteProfile: (id) => {
-                if (window.state.role !== 'juez') return window.ui.showToast("Permiso denegado: Solo Juez puede eliminar perfiles.", "error");
-                
+                if (window.state.role !== 'juez') return window.ui.showToast("Permiso denegado", "error");
                 const inmate = window.state.inmates.find(i => i.id === id);
                 if (!inmate) return;
-
-                window.ui.showConfirm("⚠️ ELIMINAR PERFIL COMPLETO", `¿Está seguro de eliminar a ${inmate.fullName}? Se borrarán permanentemente el perfil y sus ${inmate.documents?.length || 0} documentos asociados.`, async () => {
-                    window.ui.setLoading(true, "Eliminando perfil y archivos...");
+                window.ui.showConfirm("⚠️ ELIMINAR LEGAJO", `Se borrará a ${inmate.fullName} y sus documentos.`, async () => {
+                    window.ui.setLoading(true, "Borrando legajo...");
                     try {
-                        // 1. Borrar archivos de Storage asociados
                         const docs = inmate.documents || [];
                         const deletePromises = docs.map(doc => {
-                            try {
-                                return firebase.storage().refFromURL(doc.url).delete().catch(e => console.warn("Archivo ya no existía en storage", e));
-                            } catch (e) { return Promise.resolve(); }
+                            try { return firebase.storage().refFromURL(doc.url).delete(); } catch (e) { return Promise.resolve(); }
                         });
                         await Promise.all(deletePromises);
-
-                        // 2. Borrar documento de Firestore
                         await firebase.firestore().collection('inmate_profiles').doc(id).delete();
-
-                        // 3. Log Auditoria (Queda el registro aunque se borre el perfil)
-                        window.logic.logAudit(id, "PERFIL ELIMINADO", `Nombre: ${inmate.fullName}. Documentos borrados: ${docs.length}`);
-
+                        window.logic.logAudit(id, "PERFIL ELIMINADO", `Nombre: ${inmate.fullName}`);
                         window.state.lastLocalUpdate = Date.now();
                         window.state.selectedInmate = null;
                         
-                        // 4. Limpiar vista
+                        // --- MEJORA 1: REFRESCAR LISTA TRAS BORRAR ---
                         window.app.renderDashboard(); 
-                        window.ui.showToast("Perfil eliminado correctamente", "success");
-
-                    } catch (e) {
-                        console.error(e);
-                        window.ui.showToast("Error al eliminar perfil: " + e.message, 'error');
-                    } finally {
-                        window.ui.setLoading(false);
-                    }
+                        
+                        window.ui.showToast("Legajo eliminado", "success");
+                    } catch (e) { window.ui.showToast("Error: " + e.message, 'error'); } finally { window.ui.setLoading(false); }
                 });
             },
             toggleStatus: (id, currentStatusRaw) => {
                 if (window.state.role === 'consulta') return window.ui.showToast("Solo lectura", "error");
-
                 const currentStatus = (currentStatusRaw && currentStatusRaw !== 'undefined') ? currentStatusRaw : 'Activo';
                 const newStatus = currentStatus === 'Activo' ? 'Libertad Definitiva' : 'Activo';
-                window.ui.showConfirm("Cambio de Estado", `¿Desea cambiar el estado a "${newStatus}"?`, async () => {
+                window.ui.showConfirm("Cambio de Estado", `¿Cambiar a "${newStatus}"?`, async () => {
                     try {
                         window.state.lastLocalUpdate = Date.now();
                         await firebase.firestore().collection('inmate_profiles').doc(id).update({ status: newStatus });
-                        window.logic.logAudit(id, "Cambio de Estado", `De ${currentStatus} a ${newStatus}`);
-                        window.ui.showToast(`Estado actualizado: ${newStatus}`, 'success');
+                        window.logic.logAudit(id, "Cambio de Estado", `A ${newStatus}`);
+                        window.ui.showToast(`Estado actualizado`, 'success');
                         if (window.state.selectedInmate?.id === id) { window.state.selectedInmate.status = newStatus; window.app.renderInmateDetail(); }
-                    } catch (e) { window.ui.showToast("Error actualizando estado", 'error'); }
+                    } catch (e) { window.ui.showToast("Error actualizando", 'error'); }
                 });
             }
         };
 
+        // --- APLICACIÓN PRINCIPAL (Renders Modernizados) ---
         window.app = {
             login: async (e) => {
                 e.preventDefault();
                 const role = document.getElementById('role-select').value;
                 localStorage.setItem('user_role_pref', role);
-
                 try { await firebase.auth().signInWithEmailAndPassword(e.target.email.value, e.target.password.value); } 
                 catch (error) { window.ui.showToast(error.message, 'error'); }
             },
@@ -966,7 +975,7 @@
                             if (change.type === 'modified') {
                                 const prevData = window.state.inmates.find(i => i.id === change.doc.id);
                                 if (prevData) {
-                                    if ((newData.documents?.length || 0) > (prevData.documents?.length || 0)) window.ui.showToast(`🔔 Actualización: Se agregaron documentos nuevos en el perfil de ${newData.fullName}`, 'update');
+                                    if ((newData.documents?.length || 0) > (prevData.documents?.length || 0)) window.ui.showToast(`🔔 Nuevos documentos en legajo de ${newData.fullName}`, 'update');
                                     if (newData.status !== prevData.status) window.ui.showToast(`🔔 Estado: ${newData.fullName} ahora está "${newData.status}"`, 'update');
                                 }
                             }
@@ -993,7 +1002,7 @@
             selectInmate: (id) => { window.state.selectedInmate = window.state.inmates.find(i => i.id === id); window.app.renderInmateDetail(); },
             createManualInmate: () => {
                 if (window.state.role === 'consulta') return window.ui.showToast("Permiso denegado", "error");
-                window.ui.showInput("Crear Nuevo Perfil", "Ingrese nombre completo:", async (name) => {
+                window.ui.showInput("Nuevo Perfil", "Nombre completo:", async (name) => {
                     try {
                         const db = firebase.firestore();
                         const docRef = await db.collection('inmate_profiles').add({
@@ -1004,32 +1013,43 @@
                         window.logic.logAudit(docRef.id, "Creación de Perfil", `Nombre: ${name}`);
                         window.ui.showToast("Perfil creado", 'success');
                         window.app.selectInmate(docRef.id);
-                    } catch (err) { window.ui.showToast("Error creando perfil", 'error'); }
+                    } catch (err) { window.ui.showToast("Error creando", 'error'); }
                 });
             },
             renderLogin: () => {
                 document.getElementById('app-container').innerHTML = `
-                    <div class="w-full h-full flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] overflow-y-auto">
-                        <div class="bg-slate-900 p-8 rounded-xl border border-slate-700 shadow-2xl w-96 m-4">
-                            <h2 class="text-2xl font-bold text-white mb-2">Acceso Seguro</h2>
-                            <form onsubmit="window.app.login(event)" class="space-y-4 mt-6">
+                    <div class="w-full h-full flex items-center justify-center bg-slate-950 overflow-y-auto relative">
+                        <!-- Background Pattern -->
+                        <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(#4f46e5 1px, transparent 1px); background-size: 24px 24px;"></div>
+                        
+                        <div class="glass-panel p-8 rounded-2xl border border-slate-700/50 shadow-2xl w-full max-w-md m-4 relative z-10">
+                            <div class="text-center mb-8">
+                                <div class="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-700 shadow-lg">
+                                    <span class="text-3xl">⚖️</span>
+                                </div>
+                                <h2 class="text-2xl font-bold text-white tracking-tight">Acceso Judicial</h2>
+                                <p class="text-sm text-slate-400 mt-1">Perfilador JEP2</p>
+                            </div>
+                            <form onsubmit="window.app.login(event)" class="space-y-5">
                                 <div>
-                                    <label class="text-xs text-slate-500 block mb-1">Email</label>
-                                    <input type="email" name="email" required class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none">
+                                    <label class="text-xs text-slate-400 block mb-1.5 uppercase font-bold tracking-wider">Credenciales</label>
+                                    <input type="email" name="email" placeholder="usuario@poderjudicial.gob.ar" required class="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-3 text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all">
                                 </div>
                                 <div>
-                                    <label class="text-xs text-slate-500 block mb-1">Contraseña</label>
-                                    <input type="password" name="password" required class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none">
+                                    <input type="password" name="password" placeholder="Contraseña" required class="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-3 text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all">
                                 </div>
                                 <div>
-                                    <label class="text-xs text-slate-500 block mb-1">Rol (Simulación)</label>
-                                    <select id="role-select" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none">
-                                        <option value="juez">Juez (Total)</option>
-                                        <option value="secretario">Secretario (Edición)</option>
-                                        <option value="consulta">Consulta (Lectura)</option>
-                                    </select>
+                                    <label class="text-xs text-slate-400 block mb-1.5 uppercase font-bold tracking-wider">Rol (Simulación)</label>
+                                    <div class="relative">
+                                        <select id="role-select" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-3 text-white focus:border-indigo-500 outline-none appearance-none cursor-pointer">
+                                            <option value="juez">Juez de Ejecución</option>
+                                            <option value="secretario">Secretario / Operador</option>
+                                            <option value="consulta">Solo Consulta</option>
+                                        </select>
+                                        <div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-500">▼</div>
+                                    </div>
                                 </div>
-                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded transition">Ingresar</button>
+                                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition shadow-lg shadow-indigo-900/30">Ingresar al Sistema</button>
                             </form>
                         </div>
                     </div>`;
@@ -1038,41 +1058,96 @@
                 const canEdit = window.state.role !== 'consulta';
                 
                 document.getElementById('app-container').innerHTML = `
-                    <aside class="w-full md:w-80 bg-slate-900 border-r border-slate-800 flex flex-col h-1/3 md:h-full flex-none overflow-hidden z-10">
-                        <div class="p-4 border-b border-slate-800 space-y-3 bg-slate-900">
-                            <div class="flex justify-between items-center px-1 mb-1">
-                                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Estadísticas</span>
-                                <div class="flex gap-3 text-xs font-mono">
-                                    <span class="text-slate-400">Total: <b id="total-count" class="text-white">...</b></span>
-                                    <span class="text-green-500/80">Activos: <b id="active-count" class="text-green-400">...</b></span>
-                                </div>
-                            </div>
-                            <input type="text" placeholder="Buscar..." oninput="window.app.handleSearch(this.value)" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none">
-                            
-                            <!-- CONTROLES DE GESTIÓN (Solo si puede editar) -->
-                            <div class="${canEdit ? '' : 'hidden'} space-y-3">
-                                <div class="flex gap-2"><button onclick="window.app.createManualInmate()" class="flex-1 bg-slate-800 text-xs text-white py-2 rounded border border-slate-600 hover:bg-slate-700">+ Nuevo</button></div>
-                                <div id="mass-upload-zone" class="drop-zone p-3 rounded bg-slate-950/50 border-dashed border-slate-600 text-center cursor-pointer"><p class="text-[10px] text-slate-400">📂 Carga Masiva (PDF)</p><input type="file" id="mass-input" accept=".pdf" class="hidden" onchange="window.logic.processMassList(this.files[0])"></div>
+                <!-- SIDEBAR LISTA (Móvil: Arriba / Desktop: Izquierda) -->
+                <aside class="w-full md:w-80 lg:w-96 bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col h-[40vh] md:h-full flex-none z-10 shadow-xl">
+                    
+                    <!-- Buscador y Stats -->
+                    <div class="p-4 space-y-4 bg-slate-900/50 backdrop-blur-sm z-10 border-b border-slate-800">
+                        <div class="relative">
+                            <!-- PERSISTENCIA DE BÚSQUEDA -->
+                            <input type="text" placeholder="Buscar por nombre o ID..." value="${window.state.searchQuery}" oninput="window.app.handleSearch(this.value)" 
+                                class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all shadow-inner placeholder-slate-600">
+                            <svg class="w-4 h-4 text-slate-500 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+
+                        <div class="flex justify-between items-center text-xs px-1">
+                            <span class="text-slate-500 font-semibold uppercase tracking-wider">Expedientes</span>
+                            <div class="flex gap-3 font-mono">
+                                <span class="text-slate-400" title="Total">Total: <b id="total-count" class="text-white">...</b></span>
+                                <span class="text-emerald-500/90" title="Activos">Activos: <b id="active-count" class="text-emerald-400">...</b></span>
                             </div>
                         </div>
-                        <div id="inmate-list" class="flex-1 overflow-y-auto p-2 space-y-1 scroll-smooth"></div>
-                    </aside>
-                    <section id="main-content" class="flex-1 bg-slate-950 relative flex flex-col h-2/3 md:h-full overflow-hidden min-w-0">
-                        <div class="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 text-center"><p>Seleccione un interno del listado.</p></div>
-                    </section>`;
+
+                        ${canEdit ? `
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="window.app.createManualInmate()" class="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium py-2 rounded-lg border border-slate-700 transition shadow-sm">
+                                <span>+</span> Crear Perfil
+                            </button>
+                            <div id="mass-upload-zone" class="relative cursor-pointer group">
+                                <div class="absolute inset-0 bg-indigo-500/10 rounded-lg border border-dashed border-indigo-500/30 group-hover:border-indigo-500/60 transition pointer-events-none"></div>
+                                <div class="flex items-center justify-center gap-2 h-full py-2 text-xs text-indigo-300 font-medium">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg> 
+                                    Carga Masiva
+                                </div>
+                                <input type="file" id="mass-input" accept=".pdf" class="hidden" onchange="window.logic.processMassList(this.files[0])">
+                            </div>
+                        </div>` : ''}
+                    </div>
+
+                    <!-- Lista de Internos -->
+                    <div id="inmate-list" class="flex-1 overflow-y-auto p-2 space-y-1.5 scroll-smooth custom-scrollbar bg-slate-900/30"></div>
+                </aside>
+
+                <!-- AREA PRINCIPAL -->
+                <section id="main-content" class="flex-1 bg-slate-950 relative flex flex-col h-[60vh] md:h-full overflow-hidden min-w-0">
+                    <!-- Estado Vacío -->
+                    <div class="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 text-center animate-pulse">
+                        <div class="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-4 border border-slate-800">
+                            <span class="text-4xl grayscale opacity-30">⚖️</span>
+                        </div>
+                        <p class="text-lg font-medium text-slate-400">Seleccione un expediente</p>
+                        <p class="text-sm opacity-60">Utilice el panel lateral para buscar</p>
+                    </div>
+                </section>`;
+                
                 if(canEdit) window.ui.setupDragAndDrop('mass-upload-zone', (files) => window.logic.processMassList(files[0]));
                 if(window.state.inmates.length > 0) window.app.updateStats();
+                
+                // --- REPOBLAR LISTA AUTOMÁTICAMENTE ---
+                window.app.refreshInmateList();
             },
             refreshInmateList: () => {
                 const filtered = window.state.inmates.filter(i => i.fullName.toLowerCase().includes(window.state.searchQuery.toLowerCase()) || (i.inmateId && i.inmateId.includes(window.state.searchQuery)));
                 document.getElementById('inmate-list').innerHTML = filtered.map(i => {
                     const isFree = i.status === 'Libertad Definitiva';
-                    // Safe check for selectedInmate
                     const isSelected = window.state.selectedInmate && window.state.selectedInmate.id === i.id;
                     return `
-                    <div onclick="window.app.selectInmate('${i.id}')" class="p-3 rounded border ${isSelected ? 'bg-blue-900/20 border-blue-500/50' : 'border-transparent'} cursor-pointer hover:bg-slate-800 transition">
-                        <h3 class="text-sm font-bold ${isFree ? 'text-green-400' : 'text-slate-200'} truncate flex items-center gap-2"><span>${isFree ? '🕊️' : '🙋'}</span> ${i.fullName}</h3>
-                        <div class="flex justify-between items-center mt-1 pl-6"><span class="text-[10px] text-slate-500 font-mono">${i.inmateId || 'N/A'}</span><span class="text-[9px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">${i.documents?.length || 0} Docs</span></div>
+                    <div onclick="window.app.selectInmate('${i.id}')" 
+                         class="p-3.5 rounded-xl border transition-all cursor-pointer group relative overflow-hidden
+                                ${isSelected 
+                                  ? 'bg-indigo-900/20 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)]' 
+                                  : 'bg-transparent border-transparent hover:bg-slate-800 hover:border-slate-700'}">
+                        
+                        <!-- Barra lateral indicadora -->
+                        ${isSelected ? '<div class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div>' : ''}
+
+                        <div class="flex justify-between items-start mb-1 pl-2">
+                            <h3 class="text-sm font-semibold ${isFree ? 'text-emerald-400' : 'text-slate-200'} truncate pr-2">
+                                ${i.fullName}
+                            </h3>
+                            ${isFree ? '<span class="text-[10px] bg-emerald-900/30 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-900/50">Libre</span>' : ''}
+                        </div>
+                        
+                        <div class="flex justify-between items-center pl-2 mt-2">
+                            <div class="flex items-center gap-1.5 text-[10px] text-slate-500 font-mono bg-slate-950/50 px-1.5 py-0.5 rounded">
+                                <span class="opacity-50">ID:</span>
+                                <span>${i.inmateId || 'N/A'}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-500 flex items-center gap-1">
+                                <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                ${i.documents?.length || 0}
+                            </div>
+                        </div>
                     </div>`;
                 }).join('');
             },
@@ -1080,53 +1155,113 @@
                 const i = window.state.selectedInmate;
                 if (!i) return;
                 const isFree = i.status === 'Libertad Definitiva';
-                const role = window.state.role;
-                const canEdit = role !== 'consulta';
-                const canAudit = role === 'juez';
-                const canDelete = role === 'juez';
-
+                const canEdit = window.state.role !== 'consulta';
+                const canAudit = window.state.role === 'juez';
+                const canDelete = window.state.role === 'juez';
+                
                 document.getElementById('main-content').innerHTML = `
-                    <div class="flex-none p-6 border-b border-slate-800 bg-slate-900/50">
-                        <div class="flex justify-between items-start mb-2">
-                            <div class="flex items-center gap-3">
-                                <h2 class="text-xl md:text-2xl font-bold text-white">${i.fullName}</h2>
-                                <button ${canEdit ? '' : 'disabled'} onclick="window.logic.toggleStatus('${i.id}', '${i.status || 'Activo'}')" class="text-xs ${isFree ? 'bg-green-900/50 text-green-400 border-green-900' : 'bg-blue-900/50 text-blue-400 border-blue-900'} px-2 py-1 rounded border hover:opacity-80 transition cursor-pointer font-mono select-none ${canEdit ? '' : 'opacity-50 cursor-not-allowed'}" title="Clic para cambiar estado">${i.status || 'Activo'}</button>
+                    <div class="flex-none p-4 md:p-6 border-b border-slate-800 bg-slate-900/30 backdrop-blur-sm z-20">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                            
+                            <!-- Titulo y Status -->
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-xl shadow-inner border border-slate-700">
+                                    ${isFree ? '🕊️' : '👤'}
+                                </div>
+                                <div>
+                                    <h2 class="text-xl md:text-2xl font-bold text-white tracking-tight">${i.fullName}</h2>
+                                    <button ${canEdit ? '' : 'disabled'} onclick="window.logic.toggleStatus('${i.id}', '${i.status || 'Activo'}')" 
+                                        class="mt-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border transition-all hover:scale-105 active:scale-95
+                                        ${isFree 
+                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' 
+                                            : 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20'}">
+                                        ${i.status || 'Activo'}
+                                    </button>
+                                </div>
                             </div>
-                            <div class="flex gap-2 items-center">
-                                <button onclick="window.ui.openChat()" class="text-xs flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded shadow transition">
-                                    🤖 <span class="hidden md:inline">Interrogar IA</span>
+
+                            <!-- Botonera de Acción -->
+                            <div class="flex items-center gap-2 self-start md:self-auto">
+                                <button onclick="window.ui.openChat()" class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-2 rounded-lg shadow-lg shadow-indigo-900/20 transition-all transform hover:-translate-y-0.5 font-medium text-sm">
+                                    <span>🤖</span> <span class="hidden sm:inline">Asistente IA</span>
                                 </button>
+                                
                                 ${canAudit ? `
-                                    <button onclick="window.ui.openAudit('${i.id}')" class="text-xs flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-600 transition">
-                                        📜 <span class="hidden md:inline">Historial</span>
-                                    </button>
-                                    <!-- BOTON ELIMINAR PERFIL -->
-                                    <button onclick="window.logic.deleteProfile('${i.id}')" class="text-xs flex items-center gap-1 bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-1.5 rounded border border-red-900/50 transition ml-1" title="Eliminar Perfil Completo">
-                                        🗑️
-                                    </button>
+                                <div class="h-8 w-px bg-slate-700 mx-1"></div>
+                                <button onclick="window.ui.openAudit('${i.id}')" title="Historial" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                </button>
+                                <button onclick="window.logic.deleteProfile('${i.id}')" title="Eliminar Legajo" class="p-2 text-red-400/70 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
                                 ` : ''}
                             </div>
                         </div>
-                        <p class="text-slate-400 text-sm line-clamp-2">${i.crimeSummary || 'Sin resumen.'}</p>
+                        
+                        <!-- Resumen del Crimen -->
+                        <div class="bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">
+                            <p class="text-xs text-slate-500 font-mono mb-1">CARÁTULA / RESUMEN</p>
+                            <p class="text-slate-300 text-sm leading-relaxed">${i.crimeSummary || 'Sin resumen cargado.'}</p>
+                        </div>
                     </div>
-                    <div class="flex-1 overflow-y-auto p-6 bg-slate-950 scroll-smooth">
+
+                    <!-- Area de Documentos -->
+                    <div class="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-950 scroll-smooth">
+                        
                         ${canEdit ? `
-                        <div id="doc-upload-zone" class="drop-zone border-2 border-dashed border-slate-700 rounded-lg p-6 mb-6 flex flex-col items-center justify-center text-slate-500 hover:text-slate-300 hover:border-slate-500 cursor-pointer transition">
-                            <p class="text-sm font-medium">Arrastre Documento (PDF/IMG)</p>
+                        <div id="doc-upload-zone" class="drop-zone mb-8 group cursor-pointer p-8 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-700 hover:border-indigo-500/50 hover:bg-slate-900/50 transition-all gap-3">
+                            <div class="w-12 h-12 rounded-full bg-slate-800 group-hover:bg-indigo-900/20 flex items-center justify-center transition-colors">
+                                <svg class="w-6 h-6 text-slate-500 group-hover:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-sm font-medium text-slate-300 group-hover:text-white transition">Subir Documento al Expediente</p>
+                                <p class="text-xs text-slate-500 mt-1">Arrastre o haga clic (PDF, JPG, PNG)</p>
+                            </div>
                             <input type="file" id="doc-input" class="hidden" accept=".pdf,.jpg,.png,.jpeg" onchange="window.logic.processDocument(this.files[0])">
                         </div>` : ''}
-                        
-                        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 pb-10">
-                            ${(i.documents || []).map(doc => `
-                                <div class="bg-slate-900 border border-slate-800 rounded p-4 hover:border-blue-500/50 transition relative group">
-                                    <div class="flex justify-between mb-2 pr-6"><span class="text-[10px] font-bold text-blue-400 bg-blue-900/20 px-2 py-0.5 rounded">${doc.documentType || 'DOC'}</span><span class="text-[10px] text-slate-500">${doc.documentDate || ''}</span></div>
-                                    <p class="text-xs text-slate-300 mb-3 leading-relaxed">${doc.keyFindings || '...'}</p>
-                                    <div class="flex justify-between items-center mt-2 pt-2 border-t border-slate-800">
-                                        <a href="${doc.url}" target="_blank" class="text-[11px] text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1">Ver Archivo <span class="text-lg">↗</span></a>
-                                        ${canDelete ? `<button onclick="window.logic.deleteDocument('${doc.url}')" class="text-slate-600 hover:text-red-500 transition p-1 hover:bg-slate-800 rounded flex items-center gap-1" title="Eliminar documento"><span class="text-[10px] uppercase font-bold">Eliminar</span><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>` : ''}
+
+                        <div class="grid grid-cols-1 xl:grid-cols-2 gap-5 pb-12">
+                            ${(i.documents || []).map((doc, idx) => {
+                                const isNote = doc.url === '#NOTE';
+                                return `
+                                <div class="glass-panel p-5 rounded-xl hover:shadow-lg transition-all duration-300 group hover:-translate-y-1 relative overflow-hidden">
+                                    <!-- Header Card -->
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[10px] font-bold ${isNote ? 'text-emerald-300 bg-emerald-950/50 border-emerald-500/30' : 'text-indigo-300 bg-indigo-950/50 border-indigo-500/30'} border px-2 py-1 rounded uppercase tracking-wider">
+                                                ${doc.documentType || 'DOCUMENTO'}
+                                            </span>
+                                        </div>
+                                        <span class="text-[10px] text-slate-500 font-mono">${doc.documentDate || 'Fecha desconocida'}</span>
                                     </div>
-                                </div>`).join('')}
+                                    
+                                    <!-- Contenido -->
+                                    <h4 class="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">${isNote ? 'Contenido de la Nota' : 'Hallazgos Clave IA'}</h4>
+                                    <p class="text-sm text-slate-200 leading-relaxed mb-4 font-light text-justify line-clamp-6">
+                                        ${doc.keyFindings || 'Análisis pendiente...'}
+                                    </p>
+
+                                    <!-- Footer Card -->
+                                    <div class="flex justify-between items-center pt-3 border-t border-slate-700/50">
+                                        ${isNote 
+                                            ? `<button onclick="window.ui.viewNote(${idx})" class="text-xs font-medium text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 transition-colors">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                                Leer Nota Completa
+                                               </button>`
+                                            : `<a href="${doc.url}" target="_blank" class="text-xs font-medium text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 transition-colors">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                                Ver Archivo Original
+                                            </a>`
+                                        }
+                                        
+                                        ${canDelete ? `
+                                        <button onclick="window.logic.deleteDocument('${doc.url}')" class="text-slate-600 hover:text-red-400 transition p-1.5 hover:bg-red-900/10 rounded" title="Eliminar documento">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>` : ''}
+                                    </div>
+                                </div>`}).join('')}
                         </div>
+                        ${(!i.documents || i.documents.length === 0) ? '<p class="text-center text-slate-600 italic text-sm mt-10">Este legajo aún no tiene documentos digitalizados.</p>' : ''}
                     </div>`;
                 if(canEdit) window.ui.setupDragAndDrop('doc-upload-zone', (files) => window.logic.processDocument(files[0]));
             },
